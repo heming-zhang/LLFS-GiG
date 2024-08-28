@@ -1,0 +1,16 @@
+# pycache
+/__pycache__/*
+**.DS_Store
+**.pdf
+**.h5
+**.pyc
+
+# Ignore all private patient data
+/data/label_data
+/data/omics_data
+/data/pheno_data
+/data/post_data
+/data/post_ml_data
+
+# Ignore all results
+/gnn_results/
