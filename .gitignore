@@ -11,6 +11,3 @@
 /data/pheno_data
 /data/post_data
 /data/post_ml_data
-
-# Ignore all results
-/gnn_results/

@@ -15,8 +15,6 @@ from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, MultiStepLR
 import utils
 from geo_loader.geo_readgraph import read_geodata
 from enc.geo_giggat import GIG_GAT
-from post_parse import LabelParse, LoadGeoData
-from gnn_acc_analysis import acc_f1_performance
 
 
 def build_geogig_model(args, num_gene_node, device):
@@ -72,11 +70,13 @@ def train_geogig_model(data, num_feature, num_subfeature, num_subject, num_gene_
 
 def train_geogig(args, fold_n, nth_training_fold_num, device):
     # Train model on training dataset with [gene features]
-    num_feature = 1
+    num_feature = 6
     gene_num_dict_df = pd.read_csv('./data/filtered_data/gene_num_dict_df.csv')
     num_gene_node = gene_num_dict_df.shape[0]
-    gene_feature = np.load('./data/post_data/gene_x.npy')
-    gene_edge_index = np.load('./data/post_data/gene_edge_index.npy')
+    gene_feature = np.load('./data/post_data/gene_x.npy', allow_pickle=True)
+    gene_feature = gene_feature.astype(np.float32)  # or np.float64 depending on your data
+    gene_edge_index = np.load('./data/post_data/gene_edge_index.npy', allow_pickle=True)
+    gene_edge_index = gene_edge_index.astype(np.int64)  # or np.float64 depending on your data
     gene_edge_index = torch.from_numpy(gene_edge_index).long()
     
     # Train model on training dataset with [subject features]
@@ -92,15 +92,11 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
 
     # Build [Graph in Graph] model
     model = build_geogig_model(args, num_gene_node, device)
-    load_path = './gnn_result/epoch_' + str(args.num_epochs) + '_fold' + str(fold_n) + '-best/best_train_model.pth'
-    if args.model == 'load':
-        model.load_state_dict(torch.load(load_path, map_location=device))
 
     # Other parameters
     epoch_num = args.num_epochs
     learning_rate = args.lr
     # Record epoch loss and pearson correlation
-    min_train_id = 0
     max_test_acc = 0
     max_test_acc_loss = 0
     max_test_training_acc = 0
@@ -108,15 +104,15 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
     best_test_id = 0
 
     unchanged_count = 0
-    epoch_loss_list = []
-    epoch_pearson_list = []
 
     # Clean result previous epoch_i_pred files
-    folder_name = 'epoch_' + str(epoch_num) + '_fold' + str(fold_n)
+    folder_name = 'giggat/epoch_' + str(epoch_num) + '_fold' + str(fold_n)
     unit = nth_training_fold_num
     path = './gnn_result/%s-%d' % (folder_name, unit)
     while os.path.exists('./gnn_result') == False:
         os.mkdir('./gnn_result')
+    while os.path.exists('./gnn_result/giggat') == False:
+        os.mkdir('./gnn_result/giggat')
     while os.path.exists(path):
         unit += 1
         path = './gnn_result/%s-%d' % (folder_name, unit)
@@ -158,7 +154,7 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
                                     'train_pred_label': list(y_nodepred)})
         # Save best test model with trained model
         test_accuracy, test_confusion_matrix, test_label_df, test_loss = test_geogig(fold_n, model, device, args)
-        if test_accuracy > max_test_acc:
+        if test_accuracy > max_test_acc and test_accuracy <= train_accuracy:
             max_test_acc_training_loss = training_loss
             max_test_acc = test_accuracy
             max_test_acc_loss = test_loss
@@ -175,6 +171,7 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
         print('--------------------------------------------- BEST TEST TRAINING ACCURACY: ', max_test_training_acc)
         print('--------------------------------------------- BEST TEST LOSS: ', max_test_acc_loss)
         print('--------------------------------------------- BEST TEST ACCURACY: ', max_test_acc)
+        write_best_model_info(fold_n, path, best_test_id, max_test_acc_training_loss, max_test_training_acc, max_test_acc_loss, max_test_acc)
 
     return max_test_acc
 
@@ -199,11 +196,13 @@ def test_geogig_model(data, num_feature, num_subfeature, num_subject, num_gene_n
 
 def test_geogig(fold_n, model, device, args):
     # Test model on training dataset with [gene features]
-    num_feature = 1
+    num_feature = 6
     gene_num_dict_df = pd.read_csv('./data/filtered_data/gene_num_dict_df.csv')
     num_gene_node = gene_num_dict_df.shape[0]
-    gene_feature = np.load('./data/post_data/gene_x.npy')
-    gene_edge_index = np.load('./data/post_data/gene_edge_index.npy')
+    gene_feature = np.load('./data/post_data/gene_x.npy', allow_pickle=True)
+    gene_feature = gene_feature.astype(np.float32)  # or np.float64 depending on your data
+    gene_edge_index = np.load('./data/post_data/gene_edge_index.npy', allow_pickle=True)
+    gene_edge_index = gene_edge_index.astype(np.int64)  # or np.float64 depending on your data
     gene_edge_index = torch.from_numpy(gene_edge_index).long()
     
     # Test model on training dataset with [subject features]
@@ -240,6 +239,20 @@ def test_geogig(fold_n, model, device, args):
                                 'test_pred_label': list(y_nodepred)})
     return test_accuracy, test_confusion_matrix, test_label_df, test_loss
 
+def write_best_model_info(fold_n, path, max_test_acc_id, max_test_acc_training_loss, max_test_training_acc, max_test_acc_loss, max_test_acc):
+    best_model_info = (
+        f'\n-------------Fold: {fold_n} -------------\n'
+        f'\n-------------BEST TEST ACCURACY MODEL ID INFO: {max_test_acc_id} -------------\n'
+        '--- TRAIN ---\n'
+        f'BEST MODEL TRAIN LOSS: {max_test_acc_training_loss}\n'
+        f'BEST MODEL TRAIN ACCURACY: {max_test_training_acc}\n'
+        '--- TEST ---\n'
+        f'BEST MODEL TEST LOSS: {max_test_acc_loss}\n'
+        f'BEST MODEL TEST ACCURACY: {max_test_acc}\n'
+    )
+    with open(os.path.join(path, 'best_model_info.txt'), 'w') as file:
+        file.write(best_model_info)
+
 # Parse arguments from command line
 def arg_parse():
     parser = argparse.ArgumentParser(description='GEO-WEBGNN ARGUMENTS.')
@@ -256,16 +269,16 @@ def arg_parse():
                         gamma = 0.9,
                         clip = 5.0,
                         batch_size = 16,
-                        num_epochs = 1500,
+                        num_epochs = 500,
                         unchanged_threshold = 100,
                         change_wave = 0.8,
                         num_workers = 0,
                         # graph_opt = 'gene',
                         # graph_opt = 'subject',
                         graph_opt = 'GinG',
-                        gene_input_dim = 1, # gene embedding parameters
-                        gene_hidden_dim = 1,
-                        gene_output_dim = 1,
+                        gene_input_dim = 6, # gene embedding parameters
+                        gene_hidden_dim = 6,
+                        gene_output_dim = 6,
                         gene_num_top_feature = 6,
                         gig_input_dim = 42, # gig embedding parameters (number of phenotype features)
                         gig_input_transform_dim = 18,
@@ -293,10 +306,6 @@ def run_model(k, fold_n, nth_training_fold_num):
     os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     print('MAIN DEVICE: ', device)
 
-    ### Prepare the dataset with [k-fold cross validation]
-    LabelParse().train_test(fold_n, k) # Formalize label
-    LoadGeoData().geo_load_data(fold_n) # Formalize [torch geometric] data
-
     ### Train the model
     max_test_acc = train_geogig(prog_args, fold_n, nth_training_fold_num, device)
     return max_test_acc, prog_args
@@ -304,7 +313,7 @@ def run_model(k, fold_n, nth_training_fold_num):
 
 if __name__ == "__main__":
     k = 5
-    fold_num_train = 10
+    fold_num_train = 5
     # Set fold number
     fold_n_max_unit_list = []
     for fold_n in range(1, k + 1):
@@ -318,10 +327,3 @@ if __name__ == "__main__":
                 fold_n_max_test_acc = max_test_acc
                 fold_n_max_unit = nth_training_fold_num
         fold_n_max_unit_list.append(fold_n_max_unit)
-        # print('---------------------------------------- CHECK BEST PERFORMANCE ON FOLD-' + str(fold_n) + '----------------------------------------')
-        # fold_n_best_unit_folder_path = './gnn_result/epoch_' + str(prog_args.num_epochs) + '_fold' + str(fold_n) + '-' + str(fold_n_max_unit)
-        # fold_n_best_folder_path = './gnn_result/epoch_' + str(prog_args.num_epochs) + '_fold' + str(fold_n) + '-best'
-        # # Getting all the files in the source directory
-        # files = os.listdir(fold_n_best_unit_folder_path)
-        # shutil.copytree(fold_n_best_unit_folder_path, fold_n_best_folder_path)
-        # acc_f1_performance(fold_n, fold_n_best_folder_path)
