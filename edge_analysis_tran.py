@@ -133,9 +133,9 @@ class NetAnalyse():
 if __name__ == "__main__":
     ### Model Parameters
     model_type = 'gigtran'
-    # patient_type = 't2ds'
+    patient_type = 't2ds'
     # patient_type = 'pret2ds'
-    patient_type = 'no_t2ds'
+    # patient_type = 'no_t2ds'
 
     ### Average Fold
     NetAnalyse().first_average_fold(model_type=model_type, patient_type=patient_type)
