@@ -1,24 +1,16 @@
 import os
-import pdb
+import glob
 import torch
-import shutil
 import argparse
-import tensorboardX
 import numpy as np
 import pandas as pd
-import torch.nn as nn
 from torch.autograd import Variable
-import torch.optim as optim
 from sklearn.metrics import confusion_matrix
-from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, MultiStepLR
 
 import utils
 from geo_loader.geo_readgraph import read_geodata
-from post_parse import LabelParse, LoadGeoData
-from gnn_acc_analysis import acc_f1_performance
 from enc.geo_gigtransformer_analysis import GIG_Transformer
 
-from post_parse import LabelParse, LoadGeoData
 
 
 def build_geogig_model(args, num_gene_node, device):
@@ -66,11 +58,13 @@ def test_geogig_model(fold_n, data, num_feature, num_subfeature, num_subject, nu
 
 def test_geogig(fold_n, model, device, args):
     # Test model on training dataset with [gene features]
-    num_feature = 1
+    num_feature = 6
     gene_num_dict_df = pd.read_csv('./data/filtered_data/gene_num_dict_df.csv')
     num_gene_node = gene_num_dict_df.shape[0]
-    gene_feature = np.load('./data/post_data/gene_x.npy')
-    gene_edge_index = np.load('./data/post_data/gene_edge_index.npy')
+    gene_feature = np.load('./data/post_data/gene_x.npy', allow_pickle=True)
+    gene_feature = gene_feature.astype(np.float32)  # or np.float64 depending on your data
+    gene_edge_index = np.load('./data/post_data/gene_edge_index.npy', allow_pickle=True)
+    gene_edge_index = gene_edge_index.astype(np.int64)  # or np.float64 depending on your data
     gene_edge_index = torch.from_numpy(gene_edge_index).long()
 
     # Test model on training dataset with [subject features]
@@ -80,9 +74,9 @@ def test_geogig(fold_n, model, device, args):
     num_subject = subject_dict_df.shape[0]
     graph_feature = np.load('./data/post_data/x.npy')
     edge_index = np.load('./data/post_data/edge_index.npy')
-    node_label = np.load('./data/post_data/test_label.npy')
+    node_label = np.load('./data/post_data/test_label_' + str(fold_n)  + '.npy')
     node_label_indices = np.argmax(node_label, axis=1)
-    node_idx = np.load('./data/post_data/test_idx.npy')
+    node_idx = np.load('./data/post_data/test_idx_' + str(fold_n)  + '.npy')
 
     # Run test model
     model.eval()
@@ -150,7 +144,76 @@ def arg_parse():
     return parser.parse_args()
 
 
-def analysis_model(k, fold_n, args):
+def analysis_model(fold_n, args, device):
+    # Build [GinG Transformer] Model
+    test_load_path = './gnn_result/gigtransformer/5-fold/epoch_' + str(args.num_epochs) + '_fold' + str(fold_n) + '/best_train_model.pth'
+    gene_num_dict_df = pd.read_csv('./data/filtered_data/gene_num_dict_df.csv')
+    num_gene_node = gene_num_dict_df.shape[0]
+    model = build_geogig_model(prog_args, num_gene_node, device)
+    model.load_state_dict(torch.load(test_load_path, map_location=device))
+    test_accuracy, test_confusion_matrix, test_label_df, test_loss = test_geogig(fold_n, model, device, prog_args)
+
+
+def average_sample_gene(fold_n):
+    ### Collect files name with 'gene_first_edge_weight' under folder [analysis/gigtransformer/]
+    # Define the folder path
+    folder_path = 'analysis/gigtransformer/fold_' + str(fold_n)
+    # Use glob to find files containing 'gene_first_edge_weight' in their names
+    file_pattern = os.path.join(folder_path, '*gene_first_edge_weight*')
+    print('FILE PATTERN: ', file_pattern)
+    matching_files = glob.glob(file_pattern)
+    first_edge_weight_dflist = []
+    for file_name in matching_files:
+        first_edge_weight_df = pd.read_csv(file_name)
+        first_edge_weight_dflist.append(first_edge_weight_df)
+    # Average the edge weights on the 'weight' column
+    concat_first_edge_weight_df = pd.concat(first_edge_weight_dflist)
+    concat_first_edge_weight_df = concat_first_edge_weight_df.drop(columns=['Patient_Index'])
+    avg_first_edge_weight_df = concat_first_edge_weight_df.groupby(['Actual_From', 'Actual_To'], as_index=False).mean()
+    print('AVERAGE FIRST EDGE WEIGHT SHAPE: ', avg_first_edge_weight_df.shape)
+    print('AVERAGE FIRST EDGE WEIGHT: ', avg_first_edge_weight_df)
+    avg_first_edge_weight_df.to_csv(folder_path + '/average_first_edge_weight.csv', index=False)
+
+    ### Collect files name with 'gene_block_edge_weight' under folder [analysis/gigtransformer/]
+    # Define the folder path
+    folder_path = 'analysis/gigtransformer/fold_' + str(fold_n)
+    # Use glob to find files containing 'gene_block_edge_weight' in their names
+    file_pattern = os.path.join(folder_path, '*gene_block_edge_weight*')
+    print('FILE PATTERN: ', file_pattern)
+    matching_files = glob.glob(file_pattern)
+    block_edge_weight_dflist = []
+    for file_name in matching_files:
+        block_edge_weight_df = pd.read_csv(file_name)
+        block_edge_weight_dflist.append(block_edge_weight_df)
+    # Average the edge weights on the 'weight' column
+    concat_block_edge_weight_df = pd.concat(block_edge_weight_dflist)
+    concat_block_edge_weight_df = concat_block_edge_weight_df.drop(columns=['Patient_Index'])
+    avg_block_edge_weight_df = concat_block_edge_weight_df.groupby(['Actual_From', 'Actual_To'], as_index=False).mean()
+    print('AVERAGE BLOCK EDGE WEIGHT SHAPE: ', avg_block_edge_weight_df.shape)
+    print('AVERAGE BLOCK EDGE WEIGHT: ', avg_block_edge_weight_df)
+    avg_block_edge_weight_df.to_csv(folder_path + '/average_block_edge_weight.csv', index=False)
+
+    ### Collect files name with 'gene_last_edge_weight' under folder [analysis/gigtransformer/]
+    # Define the folder path
+    folder_path = 'analysis/gigtransformer/fold_' + str(fold_n)
+    # Use glob to find files containing 'gene_last_edge_weight' in their names
+    file_pattern = os.path.join(folder_path, '*gene_last_edge_weight*')
+    print('FILE PATTERN: ', file_pattern)
+    matching_files = glob.glob(file_pattern)
+    last_edge_weight_dflist = []
+    for file_name in matching_files:
+        last_edge_weight_df = pd.read_csv(file_name)
+        last_edge_weight_dflist.append(last_edge_weight_df)
+    # Average the edge weights on the 'weight' column
+    concat_last_edge_weight_df = pd.concat(last_edge_weight_dflist)
+    concat_last_edge_weight_df = concat_last_edge_weight_df.drop(columns=['Patient_Index'])
+    avg_last_edge_weight_df = concat_last_edge_weight_df.groupby(['Actual_From', 'Actual_To'], as_index=False).mean()
+    print('AVERAGE LAST EDGE WEIGHT SHAPE: ', avg_last_edge_weight_df.shape)
+    print('AVERAGE LAST EDGE WEIGHT: ', avg_last_edge_weight_df)
+    avg_last_edge_weight_df.to_csv(folder_path + '/average_last_edge_weight.csv', index=False)
+    return avg_first_edge_weight_df, avg_block_edge_weight_df, avg_last_edge_weight_df
+
+if __name__ == "__main__":
     ### Prepare the hyperparameters
     prog_args = arg_parse() # Parse argument from terminal or default parameters
     device, prog_args.gpu_ids = utils.get_available_devices() # Check and allocate resources
@@ -160,21 +223,12 @@ def analysis_model(k, fold_n, args):
     os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     print('MAIN DEVICE: ', device)
 
-    ### Prepare the dataset with [k-fold cross validation]
-    LabelParse().train_test(fold_n, k) # Formalize label
-    LoadGeoData().geo_load_data(fold_n) # Formalize [torch geometric] data
-
-    # Build [GinG Transformer] Model
-    test_load_path = './gnn_result/gigtransformer/5-fold/epoch_' + str(args.num_epochs) + '_fold' + str(fold_n) + '/best_train_model.pth'
-    test_save_path = './gnn_result/gigtransformer/5-fold/epoch_' + str(args.num_epochs) + '_fold' + str(fold_n)
-    gene_num_dict_df = pd.read_csv('./data/filtered_data/gene_num_dict_df.csv')
-    num_gene_node = gene_num_dict_df.shape[0]
-    model = build_geogig_model(prog_args, num_gene_node, device)
-    model.load_state_dict(torch.load(test_load_path, map_location=device))
-    test_accuracy, test_confusion_matrix, test_label_df, test_loss = test_geogig(fold_n, model, device, prog_args)
-
-
-if __name__ == "__main__":
+    ### Run the model analysis
     k = 5
-    fold_n = 1
-    analysis_model(k, fold_n)
+    for fold_n in range(1, k + 1):
+        analysis_model(fold_n, prog_args, device)
+
+    ### Average the edge weights on gene graph on each fold
+    k = 5
+    for fold_n in range(1, k + 1):
+        avg_first_edge_weight_df, avg_block_edge_weight_df, avg_last_edge_weight = average_sample_gene(fold_n)

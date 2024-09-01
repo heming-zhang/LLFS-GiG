@@ -304,7 +304,6 @@ class PatientTransformerConv(MessagePassing):
         print(edge_weight.shape)
         # TO AVERAGE WEIGHT(alpha) WITH [degree]
         num_edge_df = pd.read_csv('./data/filtered_data/num_edge_df.csv')
-        num_edge = num_edge_df.shape[0]
         patient_edge_weight_df = num_edge_df.copy()
         patient_edge_weight_df['Weight'] = edge_weight[:,0]
 

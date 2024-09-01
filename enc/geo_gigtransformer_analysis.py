@@ -14,7 +14,6 @@ from torch_geometric import utils
 from torch_geometric.nn import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.typing import Adj, OptTensor, PairTensor, SparseTensor
-from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.utils import add_self_loops, degree, softmax
 
@@ -105,12 +104,9 @@ class GeneTransformerConv(MessagePassing):
         query = self.lin_query(x[1]).view(-1, H, C)
         key = self.lin_key(x[0]).view(-1, H, C)
         value = self.lin_value(x[0]).view(-1, H, C)
-
+        
         # propagate_type: (query: Tensor, key:Tensor, value: Tensor, edge_attr: OptTensor) # noqa
-        row, col = edge_index
-        deg_col = degree(col, x[0].size(0), dtype=x[0].dtype)
-        deg_row = degree(row, x[0].size(0), dtype=x[0].dtype)
-        out = self.propagate(edge_index=edge_index, deg_col=deg_col, deg_row=deg_row, query=query, key=key, value=value,
+        out = self.propagate(edge_index, query=query, key=key, value=value,
                              edge_attr=edge_attr, size=None)
         
         alpha = self._alpha
@@ -140,7 +136,7 @@ class GeneTransformerConv(MessagePassing):
             return out
 
 
-    def message(self, edge_index: Tensor, deg_col: Tensor, deg_row: Tensor,  query_i: Tensor, key_j: Tensor, value_j: Tensor,
+    def message(self, edge_index, query_i: Tensor, key_j: Tensor, value_j: Tensor,
                 edge_attr: OptTensor, index: Tensor, ptr: OptTensor,
                 size_i: Optional[int]) -> Tensor:
 
@@ -159,7 +155,7 @@ class GeneTransformerConv(MessagePassing):
         if self.index is not None:
             edge_index_npy = edge_index.cpu().detach().numpy()
             edge_weight = alpha.cpu().detach().numpy()
-            print(edge_weight.shape)
+            # print(edge_weight.shape)
             # TO AVERAGE WEIGHT(alpha) WITH [degree]
             gene_num_edge_df = pd.read_csv('./data/filtered_data/gene_num_edge_df.csv')
             num_edge = gene_num_edge_df.shape[0]
@@ -176,13 +172,11 @@ class GeneTransformerConv(MessagePassing):
             edge_weight_df['Patient_Index'] = repeated_patient_index_list
             edge_weight_df['Batch_Index'] = repeated_batch_index_list
             edge_weight_df['Weight'] = edge_weight[:,0]
-            edge_weight_df['Degree_Row'] = deg_row[row].cpu().detach().numpy()
-            edge_weight_df['Degree_Col'] = deg_col[col].cpu().detach().numpy()
             edge_weight_df['Actual_From'] = edge_weight_df['From'] - edge_weight_df['Batch_Index'] * num_gene_node
             edge_weight_df['Actual_To'] = edge_weight_df['To'] - edge_weight_df['Batch_Index'] * num_gene_node
-            edge_weight_df = edge_weight_df[['Patient_Index', 'Actual_From', 'Actual_To', 'Weight', 'Degree_Row', 'Degree_Col']]
+            edge_weight_df = edge_weight_df[['Patient_Index', 'Actual_From', 'Actual_To', 'Weight']]
 
-            save_path = './analysis/fold_' + str(self.fold_n)
+            save_path = './analysis/gigtransformer/fold_' + str(self.fold_n)
             while os.path.exists(save_path) == False:
                 os.mkdir(save_path)
             edge_weight_df.to_csv(save_path + '/' + self.layer + '_edge_weight_' + str(num_subfeature + self.index) + '_' + str(num_subfeature + self.upper_index-1) + '.csv', index=False, header=True)
@@ -269,6 +263,8 @@ class PatientTransformerConv(MessagePassing):
                 edge_attr: OptTensor = None, return_attention_weights=None):
 
         H, C = self.heads, self.out_channels
+        self.layer = layer
+        self.fold_n = fold_n
 
         if isinstance(x, Tensor):
             x: PairTensor = (x, x)
@@ -325,7 +321,18 @@ class PatientTransformerConv(MessagePassing):
         self._alpha = alpha
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
-        # import pdb; pdb.set_trace()
+        edge_weight = alpha.cpu().detach().numpy()
+        print(edge_weight.shape)
+        # TO AVERAGE WEIGHT(alpha) WITH [degree]
+        num_edge_df = pd.read_csv('./data/filtered_data/num_edge_df.csv')
+        patient_edge_weight_df = num_edge_df.copy()
+        patient_edge_weight_df['Weight'] = edge_weight[:,0]
+
+        save_path = './analysis/gigtransformer/fold_' + str(self.fold_n)
+        while os.path.exists(save_path) == False:
+            os.mkdir(save_path)
+        patient_edge_weight_df.to_csv(save_path + '/' + self.layer + '_patient_edge_weight.csv', index=False, header=True)
+
         out = value_j
         if edge_attr is not None:
             out = out + edge_attr
