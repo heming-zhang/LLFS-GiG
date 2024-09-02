@@ -178,8 +178,7 @@ def add_node_degree(input_df):
 
 if __name__ == "__main__":
     ## Model Parameters
-    # model_type_list = ['gigtransformer-norm', 'gigtransformer-binorm', 'gigtransformer-rownorm']
-    model_type_list = ['gigtransformer-binorm', 'gigtransformer-rownorm']
+    model_type_list = ['gigtransformer-norm', 'gigtransformer-binorm', 'gigtransformer-rownorm']
     patient_type_list = ['t2ds', 'pret2ds', 'no_t2ds']
 
     for model_type in model_type_list:
@@ -188,12 +187,11 @@ if __name__ == "__main__":
             os.makedirs('./analysis/' + model_type)
         # Generate edge weight files for each patient type in each layer
         for patient_type in patient_type_list:
-            # ### Average Fold
+            ### Average Fold
             NetAnalyse().first_average_fold(model_type=model_type, patient_type=patient_type)
             NetAnalyse().block_average_fold(model_type=model_type, patient_type=patient_type)
             NetAnalyse().last_average_fold(model_type=model_type, patient_type=patient_type)
             NetAnalyse().layer_average_fold(model_type=model_type, patient_type=patient_type)
-            
             ### Patient specific
             NetAnalyse().norm_edge_node_analysis(model_type=model_type, patient_type=patient_type)
             NetAnalyse().norm_core_signaling_analysis(model_type=model_type, patient_type=patient_type, edge_percentile=85, node_percentile=85)

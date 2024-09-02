@@ -17,21 +17,21 @@ ui <- fluidPage(
                                  'No_t2ds' = 3),
                   selected = 1),
       
-      # selectInput('type_comparison', label = 'Selection of the type comparisons',
-      #             choices = list('T2ds and Pret2ds' = 1, 
-      #                            'T2ds and No_t2ds' = 2,
-      #                            'Pret2ds and No_t2ds' = 3),
-      #             selected = 2),
+      selectInput('type_comparison', label = 'Selection of the type comparisons',
+                  choices = list('T2ds and Pret2ds' = 1,
+                                 'T2ds and No_t2ds' = 2,
+                                 'Pret2ds and No_t2ds' = 3),
+                  selected = 2),
       
       sliderInput('edge_threshold',
                   'Select the threshold of edge weight to plot',
                   min = 0, max = 1.0,
-                  value = 0.06),
+                  value = 0.07),
       
       sliderInput('edge_threshold2',
                   'Select the threshold of marking important edge weight',
                   min = 0, max = 1.0,
-                  value = 0.06),
+                  value = 0.2),
 
       sliderInput('node_threshold',
                   'Select the threshold of marking important genes',
@@ -45,18 +45,18 @@ ui <- fluidPage(
       
       sliderInput('giant_comp_threshold',
                   'Select the threshold of each component',
-                  min = 0.0, max = 30.0,
-                  value = 20.0),
+                  min = 0.0, max = 20.0,
+                  value = 10.0),
 
       sliderInput('gene_node_size',
                   'Select the gene node size',
-                  min = 5, max = 10,
+                  min = 2, max = 10,
                   value = 5.0),
 
       sliderInput('imgene_node_size',
                   'Select the important gene node size',
                   min = 5, max = 10,
-                  value = 8.0),
+                  value = 7.0),
 
       sliderInput('gene_label_size',
                   'Select the label size of gene nodes',
@@ -100,19 +100,18 @@ server <- function(input, output) {
     } else if (input$diabetes_type == 3){
       type = 'no_t2ds'
     }
-    type_path = paste('./analysis/gigtran-gene-rownorm/', as.character(type), sep='')
-    edge_path = paste(type_path, '_layer_new_average_fold_gene_edge_weight_df.csv', sep='')
+    type_path = paste('./analysis/gigtransformer-binorm/', as.character(type), sep='')
+    edge_path = paste(type_path, '_layer_norm_average_fold_gene_edge_weight_df.csv', sep='')
     net_edge_weight = read.csv(edge_path)
     all_net_node = read.csv('./data/filtered_data/gene_num_dict_df.csv') # NODE LABEL
-    node_path = paste(type_path, '_layer_new_average_fold_node_weight_df.csv', sep='')
-    type_net_node = read.csv('./analysis/gigtran-gene-rownorm/t2ds_layer_new_average_fold_node_weight_df.csv')
+    node_path = paste(type_path, '_layer_norm_average_fold_node_weight_df.csv', sep='')
+    type_net_node = read.csv('./analysis/gigtransformer-binorm/t2ds_layer_norm_average_fold_node_weight_df.csv')
     net_node = merge(x = all_net_node, y = type_net_node, by.x = c('gene_node_idx'), by.y =c('Node_idx'))
     
     ### 2.1 FILTER EDGE BY [edge_weight]
     filter_net_edge = filter(net_edge_weight, Weight > edge_threshold())
     filter_net_edge_node = unique(c(filter_net_edge$Actual_From, filter_net_edge$Actual_To))
     filter_net_node = net_node[net_node$gene_node_idx %in% filter_net_edge_node, ]
-    
     
     # # # ### 2.1 FILTER AGAIN NODE BY [node_weight]
     # filter_net_node = filter(filter_net_node, Weight > node_threshold())
@@ -139,66 +138,60 @@ server <- function(input, output) {
     refilter_net_node = filter_net_node[filter_net_node$gene_node_idx %in% refilter_net_edge_node,]
     
     
-    
-    f_net_edge = net_edge_weight[net_edge_weight$Actual_From %in% refilter_net_node$gene_node_idx & net_edge_weight$Actual_To %in% refilter_net_node$gene_node_idx, ]
-    
-    
     # 3.2 USE REWEIGHTED IDF NODE DEGREE AS NODE DEGREE
-    print('Number of edges')
-    print(nrow(f_net_edge))
-    print('Number of nodes')
+    print(nrow(refilter_net_edge))
     print(nrow(refilter_net_node))
     sorted_refilter_net_node <- refilter_net_node[order(refilter_net_node$Weight, decreasing = TRUE), ]
-    refilter_edge_path = paste(type_path, '_new_refilter_edge_weight_df.csv', sep='')
+    refilter_edge_path = paste(type_path, '_norm_refilter_edge_weight_df.csv', sep='')
     write.csv(refilter_net_edge, refilter_edge_path)
-    refilter_node_path = paste(type_path, '_new_refilter_node_weight_df.csv', sep='')
+    refilter_node_path = paste(type_path, '_norm_refilter_node_weight_df.csv', sep='')
     write.csv(sorted_refilter_net_node, refilter_node_path)
     
-    # # 3.3 SELECT AND CALCULATE P-VALUE
-    # subject_nodeidx_gene_df = read.csv('./data/filtered_data/kegg_intersected_norm_fltr_counts_gene_v1_id_intersected_subject_nodeidx_upper_all_gene_df.csv')
-    # label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
-    # t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
-    # pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
-    # no_t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$no_t2ds == 1, ]
-    # 
-    # t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% t2ds_nodeidx_df$node_idx, ]
-    # pret2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% pret2ds_nodeidx_df$node_idx, ]
-    # no_t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% no_t2ds_nodeidx_df$node_idx, ]
-    # 
-    # for(i in 1:nrow(sorted_refilter_net_node)) {
-    #   gene_name <- sorted_refilter_net_node[i, 'gene_node_name']
-    #   t2ds_gene_value_list <- t2ds_subject_nodeidx_gene_df[[gene_name]]
-    #   pret2ds_gene_value_list <- pret2ds_subject_nodeidx_gene_df[[gene_name]]
-    #   no_t2ds_gene_value_list <- no_t2ds_subject_nodeidx_gene_df[[gene_name]]
-    #   
-    #   t2ds_pret2ds_test_result <- wilcox.test(t2ds_gene_value_list, pret2ds_gene_value_list)
-    #   print(t2ds_pret2ds_test_result$p.value)
-    #   sorted_refilter_net_node$t2ds_pret2ds_pvalue[i] = t2ds_pret2ds_test_result$p.value
-    #   
-    #   t2ds_no_t2ds_test_result <- wilcox.test(t2ds_gene_value_list, no_t2ds_gene_value_list)
-    #   print(t2ds_no_t2ds_test_result$p.value)
-    #   sorted_refilter_net_node$t2ds_no_t2ds_pvalue[i] = t2ds_no_t2ds_test_result$p.value
-    #   
-    #   pret2ds_no_t2ds_test_result <- wilcox.test(pret2ds_gene_value_list, no_t2ds_gene_value_list)
-    #   print(pret2ds_no_t2ds_test_result$p.value)
-    #   sorted_refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
-    # }
+    # 3.3 SELECT AND CALCULATE P-VALUE
+    subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
+    label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
+    t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
+    pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
+    no_t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$no_t2ds == 1, ]
+
+    t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% t2ds_nodeidx_df$node_idx, ]
+    pret2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% pret2ds_nodeidx_df$node_idx, ]
+    no_t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% no_t2ds_nodeidx_df$node_idx, ]
+
+    for(i in 1:nrow(sorted_refilter_net_node)) {
+      gene_name <- sorted_refilter_net_node[i, 'gene_node_name']
+      t2ds_gene_value_list <- t2ds_subject_nodeidx_gene_df[[gene_name]]
+      pret2ds_gene_value_list <- pret2ds_subject_nodeidx_gene_df[[gene_name]]
+      no_t2ds_gene_value_list <- no_t2ds_subject_nodeidx_gene_df[[gene_name]]
+
+      t2ds_pret2ds_test_result <- wilcox.test(t2ds_gene_value_list, pret2ds_gene_value_list)
+      print(t2ds_pret2ds_test_result$p.value)
+      sorted_refilter_net_node$t2ds_pret2ds_pvalue[i] = t2ds_pret2ds_test_result$p.value
+
+      t2ds_no_t2ds_test_result <- wilcox.test(t2ds_gene_value_list, no_t2ds_gene_value_list)
+      print(t2ds_no_t2ds_test_result$p.value)
+      sorted_refilter_net_node$t2ds_no_t2ds_pvalue[i] = t2ds_no_t2ds_test_result$p.value
+
+      pret2ds_no_t2ds_test_result <- wilcox.test(pret2ds_gene_value_list, no_t2ds_gene_value_list)
+      print(pret2ds_no_t2ds_test_result$p.value)
+      sorted_refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
+    }
     
-    net = graph_from_data_frame(d=f_net_edge, vertices=sorted_refilter_net_node, directed=F)
+    net = graph_from_data_frame(d=refilter_net_edge, vertices=sorted_refilter_net_node, directed=F)
     
     ### 4. NETWORK PARAMETERS SETTINGS
     # vertex frame color
     vertex_fcol = rep('black', vcount(net))
     # vertex color
     vertex_col = rep('lightblue', vcount(net))
-    vertex_col[V(net)$Weight>=node_threshold()] = 'tomato' # 'tomato'
-    # if (input$type_comparison == 1){
-    #   vertex_col[V(net)$t2ds_pret2ds_test_result<=pvalue_threshold()] = 'tomato' # 'tomato'
-    # }else if(input$type_comparison == 2){
-    #   vertex_col[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = 'tomato' # 'tomato'
-    # }else if(input$type_comparison == 3){
-    #   vertex_col[V(net)$pret2ds_no_t2ds_test_result<=pvalue_threshold()] = 'tomato' # 'tomato'
-    # }
+    # vertex_col[V(net)$Weight>=node_threshold()] = 'tomato' # 'tomato'
+    if (input$type_comparison == 1){
+      vertex_col[V(net)$t2ds_pret2ds_test_result<=pvalue_threshold()] = 'tomato' # 'tomato'
+    }else if(input$type_comparison == 2){
+      vertex_col[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = 'tomato' # 'tomato'
+    }else if(input$type_comparison == 3){
+      vertex_col[V(net)$pret2ds_no_t2ds_test_result<=pvalue_threshold()] = 'tomato' # 'tomato'
+    }
     
     # vertex size
     vertex_size = rep(input$gene_node_size, vcount(net))
@@ -207,10 +200,8 @@ server <- function(input, output) {
     vertex_cex = rep(input$gene_label_size, vcount(net))
     vertex_cex[V(net)$Weight>=node_threshold()] = input$imgene_label_size
     # edge width
-    # edge_width = (E(net)$Weight)*(5.0)
-    edge_width = rep(1.0, ecount(net))
-    # edge_width[E(net)$Weight>=edge_threshold2()] = (E(net)$Weight)*(10.0)
-    edge_width[E(net)$Weight>=edge_threshold2()] = 3.0
+    edge_width = (E(net)$Weight)*(1.0)
+    edge_width[E(net)$Weight>=edge_threshold2()] = (E(net)$Weight)*(5.0)
     # edge color
     edge_color = rep('gray', ecount(net))
     edge_color[E(net)$Weight>=edge_threshold2()] = 'black'
@@ -227,7 +218,7 @@ server <- function(input, output) {
          edge.width = edge_width,
          edge.color = edge_color,
          edge.curved = 0.2,
-         layout=layout_with_graphopt)
+         layout=layout_nicely)
     ### ADD LEGEND
     legend(x=-1.05, y=1.13, # y= -0.72,
            legend=c('Genes', 'Important Genes'), pch=c(21, 21), 

@@ -89,11 +89,11 @@ server <- function(input, output) {
       type1 = 'no_t2ds'
     }
     
-    type_path1 = paste('./analysis/gigtran-gene-rownorm/', as.character(type1), sep='')
-    edge_path1 = paste(type_path1, '_layer_new_average_fold_gene_edge_weight_df.csv', sep='')
+    type_path1 = paste('./analysis/gigtransformer-rownorm/', as.character(type1), sep='')
+    edge_path1 = paste(type_path1, '_layer_norm_average_fold_gene_edge_weight_df.csv', sep='')
     net_edge_weight1 = read.csv(edge_path1)
     all_net_node = read.csv('./data/filtered_data/gene_num_dict_df.csv') # NODE LABEL
-    node_path1 = paste(type_path1, '_layer_new_average_fold_node_weight_df.csv', sep='')
+    node_path1 = paste(type_path1, '_layer_norm_average_fold_node_weight_df.csv', sep='')
     type_net_node1 = read.csv(node_path1)
     net_node1 = merge(x = all_net_node, y = type_net_node1, by.x = c('gene_node_idx'), by.y =c('Node_idx'))
     
@@ -122,11 +122,11 @@ server <- function(input, output) {
       type2 = 'no_t2ds'
     }
     
-    type_path2 = paste('./analysis/gigtran-gene-rownorm/', as.character(type2), sep='')
-    edge_path2 = paste(type_path2, '_layer_new_average_fold_gene_edge_weight_df.csv', sep='')
+    type_path2 = paste('./analysis/gigtransformer-rownorm/', as.character(type2), sep='')
+    edge_path2 = paste(type_path2, '_layer_norm_average_fold_gene_edge_weight_df.csv', sep='')
     net_edge_weight2 = read.csv(edge_path2)
     all_net_node = read.csv('./data/filtered_data/gene_num_dict_df.csv') # NODE LABEL
-    node_path2 = paste(type_path2, '_layer_new_average_fold_node_weight_df.csv', sep='')
+    node_path2 = paste(type_path2, '_layer_norm_average_fold_node_weight_df.csv', sep='')
     type_net_node2 = read.csv(node_path2)
     net_node2 = merge(x = all_net_node, y = type_net_node2, by.x = c('gene_node_idx'), by.y =c('Node_idx'))
     
@@ -235,10 +235,10 @@ server <- function(input, output) {
     # browser()
     
     inner_join = 'inner_join'
-    inner_join_type_path = paste('./analysis/gigtran-gene-rownorm/', as.character(inner_join), sep='')
-    refilter_edge_path = paste(inner_join_type_path, '_new_refilter_edge_weight_df.csv', sep='')
+    inner_join_type_path = paste('./analysis/gigtransformer-rownorm/', as.character(inner_join), sep='')
+    refilter_edge_path = paste(inner_join_type_path, '_norm_refilter_edge_weight_df.csv', sep='')
     write.csv(refilter_net_edge, refilter_edge_path)
-    refilter_node_path = paste(inner_join_type_path, '_new_refilter_node_weight_df.csv', sep='')
+    refilter_node_path = paste(inner_join_type_path, '_norm_refilter_node_weight_df.csv', sep='')
     write.csv(refilter_net_node, refilter_node_path)
     net = graph_from_data_frame(d=refilter_net_edge, vertices=refilter_net_node, directed=F)
     
