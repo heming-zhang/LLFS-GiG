@@ -139,11 +139,11 @@ if __name__ == "__main__":
     # patient_type = 'pret2ds'
     # patient_type = 'no_t2ds'
 
-    # ### Average Fold
-    # NetAnalyse().first_average_fold(model_type=model_type, patient_type=patient_type)
-    # NetAnalyse().block_average_fold(model_type=model_type, patient_type=patient_type)
-    # NetAnalyse().last_average_fold(model_type=model_type, patient_type=patient_type)
-    # NetAnalyse().layer_average_fold(model_type=model_type, patient_type=patient_type)
+    ### Average Fold
+    NetAnalyse().first_average_fold(model_type=model_type, patient_type=patient_type)
+    NetAnalyse().block_average_fold(model_type=model_type, patient_type=patient_type)
+    NetAnalyse().last_average_fold(model_type=model_type, patient_type=patient_type)
+    NetAnalyse().layer_average_fold(model_type=model_type, patient_type=patient_type)
     
     ### Patient specific
     NetAnalyse().edge_node_analysis(model_type=model_type, patient_type=patient_type)
