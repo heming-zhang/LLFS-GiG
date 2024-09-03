@@ -1,0 +1,27 @@
+ID	Gene Name	Species	No_name
+BAK1	BCL2 antagonist/killer 1(BAK1)	Homo sapiens	
+BRIP1	BRCA1 interacting helicase 1(BRIP1)	Homo sapiens	
+BRCA2	BRCA2 DNA repair associated(BRCA2)	Homo sapiens	
+FES	FES proto-oncogene, tyrosine kinase(FES)	Homo sapiens	
+TBC1D1	TBC1 domain family member 1(TBC1D1)	Homo sapiens	
+TNFRSF1A	TNF receptor superfamily member 1A(TNFRSF1A)	Homo sapiens	
+TNFRSF1B	TNF receptor superfamily member 1B(TNFRSF1B)	Homo sapiens	
+TNFRSF6B	TNF receptor superfamily member 6b(TNFRSF6B)	Homo sapiens	
+ADORA2A	adenosine A2a receptor(ADORA2A)	Homo sapiens	
+ADRB1	adrenoceptor beta 1(ADRB1)	Homo sapiens	
+CAPNS1	calpain small subunit 1(CAPNS1)	Homo sapiens	
+CAST	calpastatin(CAST)	Homo sapiens	
+CDK5R1	cyclin dependent kinase 5 regulatory subunit 1(CDK5R1)	Homo sapiens	
+CDK5	cyclin dependent kinase 5(CDK5)	Homo sapiens	
+HSPA1L	heat shock protein family A (Hsp70) member 1 like(HSPA1L)	Homo sapiens	
+HSPA1A	heat shock protein family A (Hsp70) member 1A(HSPA1A)	Homo sapiens	
+HSPA8	heat shock protein family A (Hsp70) member 8(HSPA8)	Homo sapiens	
+LTA	lymphotoxin alpha(LTA)	Homo sapiens	
+LTB	lymphotoxin beta(LTB)	Homo sapiens	
+NECTIN2	nectin cell adhesion molecule 2(NECTIN2)	Homo sapiens	
+NECTIN3	nectin cell adhesion molecule 3(NECTIN3)	Homo sapiens	
+PALB2	partner and localizer of BRCA2(PALB2)	Homo sapiens	
+PLXNA4	plexin A4(PLXNA4)	Homo sapiens	
+POMC	proopiomelanocortin(POMC)	Homo sapiens	
+SRSF6	serine and arginine rich splicing factor 6(SRSF6)	Homo sapiens	
+TLR2	toll like receptor 2(TLR2)	Homo sapiens	
