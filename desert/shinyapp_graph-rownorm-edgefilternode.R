@@ -103,7 +103,7 @@ server <- function(input, output) {
     type_path = paste('./analysis/gigtransformer-rownorm/', as.character(type), sep='')
     edge_path = paste(type_path, '_layer_norm_average_fold_gene_edge_weight_df.csv', sep='')
     net_edge_weight = read.csv(edge_path)
-    all_net_node = read.csv('./data/filtered_data/gene_num_dict_df.csv') # NODE LABEL
+    all_net_node = read.csv('./data/filtered_data/gene_num_dict_df.csv')
     node_path = paste(type_path, '_layer_norm_average_fold_node_weight_df.csv', sep='')
     type_net_node = read.csv('./analysis/gigtransformer-rownorm/t2ds_layer_norm_average_fold_node_weight_df.csv')
     net_node = merge(x = all_net_node, y = type_net_node, by.x = c('gene_node_idx'), by.y =c('Node_idx'))
@@ -112,17 +112,16 @@ server <- function(input, output) {
     filter_net_edge = filter(net_edge_weight, Weight > edge_threshold())
     filter_net_edge_node = unique(c(filter_net_edge$Actual_From, filter_net_edge$Actual_To))
     filter_net_node = net_node[net_node$gene_node_idx %in% filter_net_edge_node, ]
+    f_net_edge = net_edge_weight[net_edge_weight$Actual_From %in% filter_net_node$gene_node_idx & net_edge_weight$Actual_To %in% filter_net_node$gene_node_idx, ]
     
-    
-    # # # ### 2.1 FILTER AGAIN NODE BY [node_weight]
+    # ### 2.1 FILTER AGAIN NODE BY [node_weight]
     # filter_net_node = filter(filter_net_node, Weight > node_threshold())
     # filter_net_edge = filter_net_edge[filter_net_edge$Actual_From %in% filter_net_node$gene_node_idx & filter_net_edge$Actual_To %in% filter_net_node$gene_node_idx, ]
-    print(filter_net_node)
-    print(filter_net_edge)
-    
+    # print(filter_net_node)
+    # print(f_net_edge)
     
     ### 2.2 FILTER WITH GIANT COMPONENT
-    tmp_net = graph_from_data_frame(d=filter_net_edge, vertices=filter_net_node, directed=F)
+    tmp_net = graph_from_data_frame(d=f_net_edge, vertices=filter_net_node, directed=F)
     # tmp_net = graph_from_data_frame(d=hop_net_edge, vertices=net_node, directed=F)
     all_components = groups(components(tmp_net))
     # COLLECT ALL LARGE COMPONENTS
@@ -134,25 +133,17 @@ server <- function(input, output) {
       }
     }
     
-    refilter_net_edge<-subset(filter_net_edge, (Actual_From %in% giant_comp_node | Actual_To %in% giant_comp_node))
+    refilter_net_edge<-subset(f_net_edge, (Actual_From %in% giant_comp_node | Actual_To %in% giant_comp_node))
     refilter_net_edge_node = unique(c(refilter_net_edge$Actual_From, refilter_net_edge$Actual_To))
     refilter_net_node = filter_net_node[filter_net_node$gene_node_idx %in% refilter_net_edge_node,]
     
     
-    
-    f_net_edge = net_edge_weight[net_edge_weight$Actual_From %in% refilter_net_node$gene_node_idx & net_edge_weight$Actual_To %in% refilter_net_node$gene_node_idx, ]
-    
-    
     # 3.2 USE REWEIGHTED IDF NODE DEGREE AS NODE DEGREE
     print('Number of edges')
-    print(nrow(f_net_edge))
+    print(nrow(refilter_net_edge))
     print('Number of nodes')
     print(nrow(refilter_net_node))
     sorted_refilter_net_node <- refilter_net_node[order(refilter_net_node$Weight, decreasing = TRUE), ]
-    refilter_edge_path = paste(type_path, '_norm_refilter_edge_weight_df.csv', sep='')
-    write.csv(refilter_net_edge, refilter_edge_path)
-    refilter_node_path = paste(type_path, '_norm_refilter_node_weight_df.csv', sep='')
-    write.csv(sorted_refilter_net_node, refilter_node_path)
     
     # 3.3 SELECT AND CALCULATE P-VALUE
     subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
@@ -184,36 +175,56 @@ server <- function(input, output) {
       sorted_refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
     }
     
-    net = graph_from_data_frame(d=f_net_edge, vertices=sorted_refilter_net_node, directed=F)
+    refilter_edge_path = paste(type_path, '_norm_refilter_edge_weight_df.csv', sep='')
+    write.csv(refilter_net_edge, refilter_edge_path)
+    refilter_node_path = paste(type_path, '_norm_refilter_node_weight_df.csv', sep='')
+    write.csv(sorted_refilter_net_node, refilter_node_path)
+    
+    net = graph_from_data_frame(d=refilter_net_edge, vertices=sorted_refilter_net_node, directed=F)
     
     ### 4. NETWORK PARAMETERS SETTINGS
     # vertex frame color
-    vertex_fcol = rep('black', vcount(net))
+    # vertex_fcol = rep('black', vcount(net))
+    vertex_fcol = rep(NA, vcount(net))
     # vertex color
-    vertex_col = rep('lightblue', vcount(net))
-    # vertex_col[V(net)$Weight>=node_threshold()] = 'tomato' # 'tomato'
+    vertex_col = rep('#A6CEE3', vcount(net))
+    # vertex_col[V(net)$Weight>=node_threshold()] = 'tomato'
     if (input$type_comparison == 1){
-      vertex_col[V(net)$t2ds_pret2ds_test_result<=pvalue_threshold()] = 'tomato' # 'tomato'
+      vertex_col[V(net)$t2ds_pret2ds_pvalue<=pvalue_threshold()] = '#FB9A99'
     }else if(input$type_comparison == 2){
-      vertex_col[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = 'tomato' # 'tomato'
+      vertex_col[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = '#FB9A99'
     }else if(input$type_comparison == 3){
-      vertex_col[V(net)$pret2ds_no_t2ds_test_result<=pvalue_threshold()] = 'tomato' # 'tomato'
+      vertex_col[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = '#FB9A99'
     }
     
     # vertex size
     vertex_size = rep(input$gene_node_size, vcount(net))
-    vertex_size[V(net)$Weight>=node_threshold()] = input$imgene_node_size
+    # vertex_size[V(net)$Weight>=node_threshold()] = input$imgene_node_size
+    if (input$type_comparison == 1){
+      vertex_size[V(net)$t2ds_pret2ds_pvalue<=pvalue_threshold()] = input$imgene_node_size
+    }else if(input$type_comparison == 2){
+      vertex_size[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_node_size
+    }else if(input$type_comparison == 3){
+      vertex_size[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_node_size
+    }
     # vertex cex
     vertex_cex = rep(input$gene_label_size, vcount(net))
-    vertex_cex[V(net)$Weight>=node_threshold()] = input$imgene_label_size
+    # vertex_cex[V(net)$Weight>=node_threshold()] = input$imgene_label_size
+    if (input$type_comparison == 1){
+      vertex_cex[V(net)$t2ds_pret2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
+    }else if(input$type_comparison == 2){
+      vertex_cex[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
+    }else if(input$type_comparison == 3){
+      vertex_cex[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
+    }
     # edge width
     # edge_width = (E(net)$Weight)*(5.0)
     edge_width = rep(1.0, ecount(net))
     # edge_width[E(net)$Weight>=marking_edge_threshold()] = (E(net)$Weight)*(10.0)
-    edge_width[E(net)$Weight>=marking_edge_threshold()] = 3.0
+    edge_width[E(net)$Weight>=marking_edge_threshold()] = 1.5
     # edge color
-    edge_color = rep('gray', ecount(net))
-    edge_color[E(net)$Weight>=marking_edge_threshold()] = 'black'
+    edge_color = rep('#C0C0C0', ecount(net))
+    edge_color[E(net)$Weight>=marking_edge_threshold()] = '#000000'
     
     set.seed(18)
     plot(net,
@@ -222,19 +233,20 @@ server <- function(input, output) {
          vertex.color = vertex_col,
          vertex.size = vertex_size,
          vertex.label = V(net)$gene_node_name,
-         vertex.label.color = 'black',
+         vertex.label.color = '#000000',
          vertex.label.cex = vertex_cex,
          edge.width = edge_width,
          edge.color = edge_color,
          edge.curved = 0.2,
-         layout=layout_nicely)
+         layout=layout_with_graphopt)
     ### ADD LEGEND
     legend(x=-1.05, y=1.13, # y= -0.72,
            legend=c('Genes', 'Important Genes'), pch=c(21, 21), 
-           pt.bg=c('lightblue', 'tomato'), pt.cex=2, cex=1.2, bty='n')
+           col = c('#A6CEE3', '#FB9A99'),
+           pt.bg=c('#A6CEE3', '#FB9A99'), pt.cex=2, cex=1.2, bty='n')
     legend(x=-1.06, y=1.05, # y= -0.85, 
            legend=c('Gene-Gene', 'Important Gene-Gene'),
-           col=c('gray', 'black'), lwd=c(5,7), cex=1.2, bty='n')
+           col=c('#C0C0C0', '#000000'), lwd=c(2, 3), cex=1.2, bty='n')
   })
 }
 

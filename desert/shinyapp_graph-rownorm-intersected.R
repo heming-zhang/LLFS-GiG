@@ -23,10 +23,32 @@ ui <- fluidPage(
                                  'No_t2ds' = 3),
                   selected = 2),
       
+      selectInput('option1_type_comparison', label = 'Selection of the first type comparisons',
+                  choices = list('T2ds and Pret2ds' = 1,
+                                 'T2ds and No_t2ds' = 2,
+                                 'Pret2ds and No_t2ds' = 3),
+                  selected = 2),
+      
+      selectInput('option2_type_comparison', label = 'Selection of the second type comparisons',
+                  choices = list('T2ds and Pret2ds' = 1,
+                                 'T2ds and No_t2ds' = 2,
+                                 'Pret2ds and No_t2ds' = 3),
+                  selected = 3),
+      
+      selectInput('option_comb', label = 'Selection of the dominant comparisons',
+                  choices = list('First type' = 1,
+                                 'Second type' = 2),
+                  selected = 1),
+      
       sliderInput('edge_threshold',
                   'Select the threshold of edge weight to plot',
-                  min = 0.1, max = 1.0,
-                  value = 0.2),
+                  min = 0.15, max = 1.0,
+                  value = 0.19),
+
+      # sliderInput('node_threshold',
+      #             'Select the threshold of marking important genes',
+      #             min = 0, max = 1.0,
+      #             value = 0.3),
       
       sliderInput('pvalue_threshold',
                   'Select the threshold of marking important genes by p-values',
@@ -206,7 +228,7 @@ server <- function(input, output) {
     ############################################################################################################################################################################
     
     # 3.3 SELECT AND CALCULATE P-VALUE
-    subject_nodeidx_gene_df = read.csv('./data/filtered_data/kegg_intersected_norm_fltr_counts_gene_v1_id_intersected_subject_nodeidx_upper_all_gene_df.csv')
+    subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
     label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
     t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
     pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
@@ -240,36 +262,66 @@ server <- function(input, output) {
     write.csv(refilter_net_edge, refilter_edge_path)
     refilter_node_path = paste(inner_join_type_path, '_norm_refilter_node_weight_df.csv', sep='')
     write.csv(refilter_net_node, refilter_node_path)
+    
     net = graph_from_data_frame(d=refilter_net_edge, vertices=refilter_net_node, directed=F)
+
+    if (input$option_comb == 1){
+      input_option_type_comparison = input$option1_type_comparison
+    }else if(input$option_comb == 2){
+      input_option_type_comparison = input$option2_type_comparison
+    }
+
+    print(input_option_type_comparison)
+    print(input_option_type_comparison)
     
     ### 4. NETWORK PARAMETERS SETTINGS
     # vertex frame color
     # vertex_fcol = rep('black', vcount(net))
     vertex_fcol = rep(NA, vcount(net))
-    
+    if (input_option_type_comparison == 1){
+      vertex_fcol[V(net)$t2ds_pret2ds_pvalue<=pvalue_threshold()] = '#FB9A99'
+    }else if(input_option_type_comparison == 2){
+      vertex_fcol[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = '#FB9A99'
+    }else if(input_option_type_comparison == 3){
+      vertex_fcol[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = '#FB9A99'
+    }
     # vertex color
-    # browser()
     vertex_col = rep('#A6CEE3', vcount(net))
-    vertex_col[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = '#B2DF8A'
-    vertex_col[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = '#CAB2D6'
-    vertex_col[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold() & V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = '#FB9A99'
+    vertex_col[V(net)$node1 == 'node_type1' & V(net)$node2 == 'no'] = '#B2DF8A'
+    vertex_col[V(net)$node1 == 'no' & V(net)$node2 == 'node_type2'] = '#CAB2D6'
+    vertex_col[V(net)$node1 == 'node_type1' & V(net)$node2 == 'node_type2'] = '#A6CEE3'
     
     # vertex size
     vertex_size = rep(input$gene_node_size, vcount(net))
-    vertex_size[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_node_size
-    vertex_size[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_node_size
-    vertex_size[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold() & V(net)$pret2ds_no_t2ds_test<=pvalue_threshold()] = input$imgene_node_size
-
+    # vertex_size[V(net)$Weight>=node_threshold()] = input$imgene_node_size
+    if (input_option_type_comparison == 1){
+      vertex_size[V(net)$t2ds_pret2ds_pvalue<=pvalue_threshold()] = input$imgene_node_size
+    }else if(input_option_type_comparison == 2){
+      vertex_size[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_node_size
+    }else if(input_option_type_comparison == 3){
+      vertex_size[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_node_size
+    }
     # vertex cex
     vertex_cex = rep(input$gene_label_size, vcount(net))
-    vertex_cex[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
-    vertex_cex[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
-    vertex_cex[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold() & V(net)$pret2ds_no_t2ds_test<=pvalue_threshold()] = input$imgene_label_size
-    
+    # vertex_cex[V(net)$Weight>=node_threshold()] = input$imgene_label_size
+    if (input_option_type_comparison == 1){
+      vertex_cex[V(net)$t2ds_pret2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
+    }else if(input_option_type_comparison == 2){
+      vertex_cex[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
+    }else if(input_option_type_comparison == 3){
+      vertex_cex[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
+    }
     # edge width
     edge_width = rep(1.0, ecount(net))
     # edge color
     edge_color = rep('#C0C0C0', ecount(net))
+    # if (input$option_comb == 1){
+    #   edge_width[E(net)$Weight1>=edge_threshold()] = 3.0
+    #   edge_color[E(net)$Weight1>=edge_threshold()] = 'black'
+    # }else if(input$option_comb == 2){
+    #   edge_width[E(net)$Weight2>=edge_threshold()] = 3.0
+    #   edge_color[E(net)$Weight2>=edge_threshold()] = 'black'
+    # }
     
     set.seed(18)
     plot(net,
@@ -286,15 +338,14 @@ server <- function(input, output) {
          layout=layout_with_graphopt)
     ### ADD LEGEND
     legend(x=-1.05, y=1.13, # y= -0.72,
-           legend=c('T2D Genes Important Genes', 'Pre_T2D Genes Important Genes', 'T2D and Pre_T2D Genes Important Genes', 'Genes'), pch=c(21, 21, 21, 21), 
-           col = c('#B2DF8A', '#CAB2D6', '#FB9A99', '#A6CEE3'),
-           pt.bg=c('#B2DF8A', '#CAB2D6', '#FB9A99', '#A6CEE3'), pt.cex=2, cex=1.2, bty='n')
+           legend=c('T2D Genes', 'Pre_T2D Genes', 'T2D and Pre_T2D Genes', 'Important Genes'), pch=c(21, 21, 21, 1), 
+           col = c('#B2DF8A', '#CAB2D6', '#A6CEE3', '#FB9A99'),
+           pt.bg = c('#B2DF8A', '#CAB2D6', '#A6CEE3', '#FB9A99'), pt.cex=2, cex=1.2, bty='n')
     legend(x=-1.06, y=0.98, # y= -0.85, 
            legend=c('Gene-Gene Interactions'),
-           col=c('#C0C0C0'), lwd=c(2, 3), cex=1.2, bty='n')
+           col=c('#C0C0C0'), lwd=c(5,7), cex=1.2, bty='n')
   })
 }
-
 
 # layout=layout_with_graphopt
 # layout=layout_with_sugiyama
