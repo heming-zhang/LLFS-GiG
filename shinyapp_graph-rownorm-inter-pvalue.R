@@ -28,6 +28,15 @@ ui <- fluidPage(
                   min = 0.1, max = 1.0,
                   value = 0.16),
       
+      selectInput('omics_type', label = 'Selection of the omics to be compared',
+                  choices = list('Epigenomics-Upstream' = 1,
+                                 'Epigenomics-Distal' = 2,
+                                 'Epigenomics-Proximal' = 3,
+                                 'Epigenomics-Core' = 4,
+                                 'Epigenomics-Downstream' = 5,
+                                 'Transcriptomics' = 6),
+                  selected = 6),
+      
       sliderInput('pvalue_threshold',
                   'Select the threshold of marking important genes by p-values',
                   min = 0, max = 0.3,
@@ -206,31 +215,34 @@ server <- function(input, output) {
     ############################################################################################################################################################################
     
     # 3.3 SELECT AND CALCULATE P-VALUE
-    subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
-    label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
-    t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
-    pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
-    no_t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$no_t2ds == 1, ]
-    
-    t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% t2ds_nodeidx_df$node_idx, ]
-    pret2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% pret2ds_nodeidx_df$node_idx, ]
-    no_t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% no_t2ds_nodeidx_df$node_idx, ]
-    
-    for(i in 1:nrow(refilter_net_node)) {
-      gene_name <- refilter_net_node[i, 'gene_node_name']
-      t2ds_gene_value_list <- t2ds_subject_nodeidx_gene_df[[gene_name]]
-      pret2ds_gene_value_list <- pret2ds_subject_nodeidx_gene_df[[gene_name]]
-      no_t2ds_gene_value_list <- no_t2ds_subject_nodeidx_gene_df[[gene_name]]
+    # 3.3.1 Pre-seletion of the omics data to be compared for the p-values
+    if (input$omics_type == 6){
+      subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
+      label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
+      t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
+      pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
+      no_t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$no_t2ds == 1, ]
       
-      t2ds_pret2ds_test_result <- wilcox.test(t2ds_gene_value_list, pret2ds_gene_value_list)
-      refilter_net_node$t2ds_pret2ds_pvalue[i] = t2ds_pret2ds_test_result$p.value
+      t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% t2ds_nodeidx_df$node_idx, ]
+      pret2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% pret2ds_nodeidx_df$node_idx, ]
+      no_t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% no_t2ds_nodeidx_df$node_idx, ]
       
-      t2ds_no_t2ds_test_result <- wilcox.test(t2ds_gene_value_list, no_t2ds_gene_value_list)
-      refilter_net_node$t2ds_no_t2ds_pvalue[i] = t2ds_no_t2ds_test_result$p.value
-      
-      pret2ds_no_t2ds_test_result <- wilcox.test(pret2ds_gene_value_list, no_t2ds_gene_value_list)
-      refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
-    }
+      for(i in 1:nrow(refilter_net_node)) {
+        gene_name <- refilter_net_node[i, 'gene_node_name']
+        t2ds_gene_value_list <- t2ds_subject_nodeidx_gene_df[[gene_name]]
+        pret2ds_gene_value_list <- pret2ds_subject_nodeidx_gene_df[[gene_name]]
+        no_t2ds_gene_value_list <- no_t2ds_subject_nodeidx_gene_df[[gene_name]]
+        
+        t2ds_pret2ds_test_result <- wilcox.test(t2ds_gene_value_list, pret2ds_gene_value_list)
+        refilter_net_node$t2ds_pret2ds_pvalue[i] = t2ds_pret2ds_test_result$p.value
+        
+        t2ds_no_t2ds_test_result <- wilcox.test(t2ds_gene_value_list, no_t2ds_gene_value_list)
+        refilter_net_node$t2ds_no_t2ds_pvalue[i] = t2ds_no_t2ds_test_result$p.value
+        
+        pret2ds_no_t2ds_test_result <- wilcox.test(pret2ds_gene_value_list, no_t2ds_gene_value_list)
+        refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
+      }
+    } 
     
     # browser()
     
@@ -286,7 +298,7 @@ server <- function(input, output) {
          layout=layout_with_graphopt)
     ### ADD LEGEND
     legend(x=-1.05, y=1.13, # y= -0.72,
-           legend=c('T2D Genes Important Genes', 'Pre_T2D Genes Important Genes', 'T2D and Pre_T2D Genes Important Genes', 'Genes'), pch=c(21, 21, 21, 21), 
+           legend=c('T2D Important Genes', 'Pre_T2D Important Genes', 'T2D and Pre_T2D Important Genes', 'Genes'), pch=c(21, 21, 21, 21), 
            col = c('#B2DF8A', '#CAB2D6', '#FB9A99', '#A6CEE3'),
            pt.bg=c('#B2DF8A', '#CAB2D6', '#FB9A99', '#A6CEE3'), pt.cex=2, cex=1.2, bty='n')
     legend(x=-1.06, y=0.98, # y= -0.85, 

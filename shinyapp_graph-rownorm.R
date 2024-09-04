@@ -181,16 +181,17 @@ server <- function(input, output) {
     
     ### 4. NETWORK PARAMETERS SETTINGS
     # vertex frame color
-    vertex_fcol = rep('black', vcount(net))
+    # vertex_fcol = rep('black', vcount(net))
+    vertex_fcol = rep(NA, vcount(net))
     # vertex color
     vertex_col = rep('lightblue', vcount(net))
-    # vertex_col[V(net)$Weight>=node_threshold()] = 'tomato' # 'tomato'
+    # vertex_col[V(net)$Weight>=node_threshold()] = '#FB9A99' # 'tomato'
     if (input$type_comparison == 1){
-      vertex_col[V(net)$t2ds_pret2ds_test_result<=pvalue_threshold()] = 'tomato' # 'tomato'
+      vertex_col[V(net)$t2ds_pret2ds_test_result<=pvalue_threshold()] = '#FB9A99' # 'tomato'
     }else if(input$type_comparison == 2){
-      vertex_col[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = 'tomato' # 'tomato'
+      vertex_col[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold()] = '#FB9A99' # 'tomato'
     }else if(input$type_comparison == 3){
-      vertex_col[V(net)$pret2ds_no_t2ds_test_result<=pvalue_threshold()] = 'tomato' # 'tomato'
+      vertex_col[V(net)$pret2ds_no_t2ds_test_result<=pvalue_threshold()] = '#FB9A99' # 'tomato'
     }
     
     # vertex size
@@ -222,7 +223,7 @@ server <- function(input, output) {
     ### ADD LEGEND
     legend(x=-1.05, y=1.13, # y= -0.72,
            legend=c('Genes', 'Important Genes'), pch=c(21, 21), 
-           pt.bg=c('lightblue', 'tomato'), pt.cex=2, cex=1.2, bty='n')
+           pt.bg=c('lightblue', '#FB9A99'), pt.cex=2, cex=1.2, bty='n')
     legend(x=-1.06, y=1.05, # y= -0.85, 
            legend=c('Gene-Gene', 'Important Gene-Gene'),
            col=c('gray', 'black'), lwd=c(5,7), cex=1.2, bty='n')
