@@ -438,6 +438,7 @@ class GIG_Transformer(nn.Module):
             gig_x = self.act(gig_x)
             x_embed = gig_x.clone()
         elif self.graph_opt == 'gene':
+            import pdb; pdb.set_trace()
             gig_x = self.gene_transform(clone_gene_x_embed) # gene features
             x_embed = gig_x.clone()
             
