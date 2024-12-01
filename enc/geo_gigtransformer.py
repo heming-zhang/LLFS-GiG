@@ -324,7 +324,7 @@ class PatientTransformerConv(MessagePassing):
 
 class GIG_Transformer(nn.Module):
     def __init__(self, gene_input_dim, gene_hidden_dim, gene_embedding_dim,
-                        gene_num_top_feature, num_gene_node,
+                        gene_num_top_feature, num_gene_node, num_key_gene_node,
                         gig_input_dim, gig_input_transform_dim, gig_hidden_dim, gig_embedding_dim,
                         num_classes, gene_num_head, gig_num_head, class_weight_fine,
                         class_weight, ortho_weight, link_weight, ent_weight, graph_opt):
@@ -332,6 +332,7 @@ class GIG_Transformer(nn.Module):
         self.gene_embedding_dim = gene_embedding_dim
         self.gene_num_top_feature = gene_num_top_feature
         self.node_weight_assign = torch.nn.Parameter(torch.Tensor(gene_num_top_feature, num_gene_node))
+        self.key_node_weight_assign = torch.nn.Parameter(torch.Tensor(gene_num_top_feature, num_key_gene_node))
 
         self.class_weight = class_weight
         self.ortho_weight = ortho_weight
@@ -364,6 +365,7 @@ class GIG_Transformer(nn.Module):
     
     def reset_parameters(self):
         glorot(self.node_weight_assign)
+        glorot(self.key_node_weight_assign)
         glorot(self.gene_transform.weight.data)
         glorot(self.pheno_transform.weight.data)
         glorot(self.out.weight.data)
@@ -380,9 +382,9 @@ class GIG_Transformer(nn.Module):
         conv_last = PatientTransformerConv(in_channels=gig_hidden_dim, out_channels=gig_embedding_dim, heads=gig_num_head)
         return conv_first, conv_block, conv_last
 
-    def forward(self, num_feature, num_subfeature, num_subject, num_gene_node, 
-                    gene_feature, gene_edge_index,
-                    x, edge_index, node_label, node_index, args, device):
+    def forward(self, num_feature, num_subfeature, num_subject, num_gene_node, num_key_gene_node,
+                    gene_feature, gene_edge_index, x, edge_index, key_gene_idx,
+                    node_label, node_index, args, device):
         ### Embeddings for gene features from batch to batch
         # Initialize the gene feature
         gene_x_embed = torch.zeros((num_subfeature + num_subject, (self.gene_num_top_feature * self.gene_embedding_dim)), requires_grad=True).to(device)
@@ -398,6 +400,8 @@ class GIG_Transformer(nn.Module):
                 # [batch_node_weight_assign] 
                 batch_node_weight_assign = self.node_weight_assign.repeat(1, upper_index - index)
                 batch_node_weight_assign = batch_node_weight_assign.view(self.gene_num_top_feature, upper_index - index, num_gene_node).transpose(0,1)
+                batch_key_node_weight_assign = self.key_node_weight_assign.repeat(1, upper_index - index)
+                batch_key_node_weight_assign = batch_key_node_weight_assign.view(self.gene_num_top_feature, upper_index - index, num_key_gene_node).transpose(0,1)
                 geo_datalist = read_batch(index=index, upper_index=upper_index, 
                                         x_input=gene_feature, num_feature=num_feature, 
                                         num_node=num_gene_node, edge_index=gene_edge_index)
@@ -412,15 +416,18 @@ class GIG_Transformer(nn.Module):
                     gene_graph_x = self.gene_conv_last(gene_graph_x, gene_graph_edge_index)
                     gene_graph_x = self.act(gene_graph_x)
                     batch_gene_x = gene_graph_x.view(-1, num_gene_node, self.gene_embedding_dim)
-                    batch_assigned_gene_x = torch.matmul(batch_node_weight_assign, batch_gene_x).reshape(upper_index - index, -1)
+                    key_batch_gene_x = batch_gene_x[:, key_gene_idx, :]
+                    # batch_assigned_gene_x = torch.matmul(batch_node_weight_assign, batch_gene_x).reshape(upper_index - index, -1)
+                    batch_assigned_key_gene_x = torch.matmul(batch_key_node_weight_assign, key_batch_gene_x).reshape(upper_index - index, -1)
                 # Preserve prediction of batch training data
-                clone_gene_x_embed[num_subfeature+index:num_subfeature+upper_index, :] = batch_assigned_gene_x
+                clone_gene_x_embed[num_subfeature+index:num_subfeature+upper_index, :] = batch_assigned_key_gene_x
+                # clone_gene_x_embed[num_subfeature+index:num_subfeature+upper_index, :] = batch_assigned_gene_x
         
         # Embeddings for [gene features / pheno features] for GiG_Transformer
         # import pdb; pdb.set_trace()
         if self.graph_opt == 'GinG':
             pheno_x = self.pheno_transform(x)
-            gig_x = torch.concat([clone_gene_x_embed, pheno_x], dim=1) # gene features + pheno features
+            gig_x = torch.cat((pheno_x, clone_gene_x_embed), dim=1)            
             gig_x = self.conv_first(gig_x, edge_index)
             gig_x = self.act(gig_x)
             gig_x = self.conv_block(gig_x, edge_index)
@@ -438,7 +445,6 @@ class GIG_Transformer(nn.Module):
             gig_x = self.act(gig_x)
             x_embed = gig_x.clone()
         elif self.graph_opt == 'gene':
-            import pdb; pdb.set_trace()
             gig_x = self.gene_transform(clone_gene_x_embed) # gene features
             x_embed = gig_x.clone()
             

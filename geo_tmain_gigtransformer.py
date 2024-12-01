@@ -17,7 +17,7 @@ from geo_loader.geo_readgraph import read_geodata
 from enc.geo_gigtransformer import GIG_Transformer
 
 
-def build_geogig_model(args, num_gene_node, device):
+def build_geogig_model(args, num_gene_node, num_key_gene_node, device):
     print('--- BUILDING UP GNN MODEL ... ---')
     # Get parameters
     model = GIG_Transformer(gene_input_dim=args.gene_input_dim, 
@@ -25,6 +25,7 @@ def build_geogig_model(args, num_gene_node, device):
                 gene_embedding_dim=args.gene_output_dim,
                 gene_num_top_feature=args.gene_num_top_feature,
                 num_gene_node=num_gene_node,
+                num_key_gene_node=num_key_gene_node,
                 gig_input_dim=args.gig_input_dim,
                 gig_input_transform_dim=args.gig_input_transform_dim,
                 gig_hidden_dim=args.gig_hidden_dim, 
@@ -42,8 +43,8 @@ def build_geogig_model(args, num_gene_node, device):
     return model
 
 
-def train_geogig_model(data, num_feature, num_subfeature, num_subject, num_gene_node,
-                    gene_feature, gene_edge_index,
+def train_geogig_model(data, num_feature, num_subfeature, num_subject, num_gene_node, num_key_gene_node,
+                    gene_feature, gene_edge_index, key_gene_idx,
                     model, device, args, optimizer, scheduler):
     loss = 0
     optimizer.zero_grad()
@@ -51,10 +52,12 @@ def train_geogig_model(data, num_feature, num_subfeature, num_subject, num_gene_
     edge_index = Variable(data.edge_index, requires_grad=False).to(device)
     node_label = Variable(data.node_label, requires_grad=False).to(device)
     node_index = Variable(data.node_index, requires_grad=False).to(device)
+    key_gene_idx = Variable(torch.LongTensor(key_gene_idx), requires_grad=False).to(device)
     x_embed, node_output, ypred, y_nodepred = model(num_feature=num_feature, num_subfeature=num_subfeature, 
                                                     num_subject=num_subject, num_gene_node=num_gene_node, 
+                                                    num_key_gene_node=num_key_gene_node,
                                                     gene_feature=gene_feature, gene_edge_index=gene_edge_index,
-                                                    x=x, edge_index=edge_index, 
+                                                    x=x, edge_index=edge_index, key_gene_idx=key_gene_idx,
                                                     node_label=node_label, node_index=node_index,
                                                     args=args, device=device)
     loss = model.loss(node_output, node_label, gene_edge_index, args.gene_num_top_feature)
@@ -88,12 +91,14 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
     # graph_feature = np.load('./data/post_data/x.npy')
     graph_feature = np.load('./data/post_data/norm_x.npy')
     edge_index = np.load('./data/post_data/edge_index.npy')
+    key_gene_idx = np.load('./data/post_data/key_gene_idx.npy')
+    num_key_gene_node = key_gene_idx.shape[0]
     node_label = np.load('./data/post_data/train_label_' + str(fold_n)  + '.npy')
     node_label_indices = np.argmax(node_label, axis=1)
     node_idx = np.load('./data/post_data/train_idx_' + str(fold_n)  + '.npy')
 
     # Build [Graph in Graph] model
-    model = build_geogig_model(args, num_gene_node, device)
+    model = build_geogig_model(args, num_gene_node, num_key_gene_node, device)
 
     # Other parameters
     epoch_num = args.num_epochs
@@ -107,13 +112,13 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
     unchanged_count = 0
 
     # Clean result previous epoch_i_pred files
-    folder_name = 'gigtransformer/epoch_' + str(epoch_num) + '_fold' + str(fold_n)
+    folder_name = 'gigtransformer-2/epoch_' + str(epoch_num) + '_fold' + str(fold_n)
     unit = nth_training_fold_num
     path = './gnn_result/%s-%d' % (folder_name, unit)
     while os.path.exists('./gnn_result') == False:
         os.mkdir('./gnn_result')
-    while os.path.exists('./gnn_result/gigtransformer') == False:
-        os.mkdir('./gnn_result/gigtransformer')
+    while os.path.exists('./gnn_result/gigtransformer-2') == False:
+        os.mkdir('./gnn_result/gigtransformer-2')
     while os.path.exists(path):
         unit += 1
         path = './gnn_result/%s-%d' % (folder_name, unit)
@@ -138,8 +143,8 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
         print('TRAINING MODEL...')
         # import pdb; pdb.set_trace()
         model, training_loss, x_embed, node_output, ypred, y_nodepred = train_geogig_model(geo_data, 
-                                                                num_feature, num_subfeature, num_subject, num_gene_node,
-                                                                gene_feature, gene_edge_index,
+                                                                num_feature, num_subfeature, num_subject, num_gene_node, num_key_gene_node,
+                                                                gene_feature, gene_edge_index, key_gene_idx,
                                                                 model, device, args, optimizer, scheduler)
         print('TRAIN LOSS: ', training_loss)
         y_nodepred = y_nodepred.cpu().detach().numpy()
@@ -178,17 +183,20 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
     return max_test_acc
 
 
-def test_geogig_model(data, num_feature, num_subfeature, num_subject, num_gene_node,
-                        gene_feature, gene_edge_index, model, device, args):
+def test_geogig_model(data, num_feature, num_subfeature, num_subject, num_gene_node, num_key_gene_node,
+                        gene_feature, gene_edge_index, key_gene_idx,
+                        model, device, args):
     loss = 0
     x = Variable(data.x, requires_grad=False).to(device)
     edge_index = Variable(data.edge_index, requires_grad=False).to(device)
     node_label = Variable(data.node_label, requires_grad=False).to(device)
     node_index = Variable(data.node_index, requires_grad=False).to(device)
+    key_gene_idx = Variable(torch.LongTensor(key_gene_idx), requires_grad=False).to(device)
     x_embed, node_output, ypred, y_nodepred = model(num_feature=num_feature, num_subfeature=num_subfeature, 
                                                     num_subject=num_subject, num_gene_node=num_gene_node, 
+                                                    num_key_gene_node=num_key_gene_node,
                                                     gene_feature=gene_feature, gene_edge_index=gene_edge_index,
-                                                    x=x, edge_index=edge_index, 
+                                                    x=x, edge_index=edge_index, key_gene_idx=key_gene_idx,
                                                     node_label=node_label, node_index=node_index,
                                                     args=args, device=device)
     loss = model.loss(node_output, node_label, gene_edge_index, args.gene_num_top_feature)
@@ -216,6 +224,8 @@ def test_geogig(fold_n, model, device, args):
     # graph_feature = np.load('./data/post_data/x.npy')
     graph_feature = np.load('./data/post_data/norm_x.npy')
     edge_index = np.load('./data/post_data/edge_index.npy')
+    key_gene_idx = np.load('./data/post_data/key_gene_idx.npy')
+    num_key_gene_node = key_gene_idx.shape[0]
     node_label = np.load('./data/post_data/test_label_' + str(fold_n)  + '.npy')
     node_label_indices = np.argmax(node_label, axis=1)
     node_idx = np.load('./data/post_data/test_idx_' + str(fold_n)  + '.npy')
@@ -226,8 +236,9 @@ def test_geogig(fold_n, model, device, args):
     # import pdb; pdb.set_trace()
     print('TEST MODEL ...')
     model, test_loss, x_embed, node_output, ypred, y_nodepred = test_geogig_model(geo_data, 
-                                                                num_feature, num_subfeature, num_subject, num_gene_node,
-                                                                gene_feature, gene_edge_index,
+                                                                num_feature, num_subfeature, num_subject, 
+                                                                num_gene_node, num_key_gene_node,
+                                                                gene_feature, gene_edge_index, key_gene_idx,
                                                                 model, device, args)
     print('TEST LOSS: ', test_loss)
     y_nodepred = y_nodepred.cpu().detach().numpy()
@@ -278,9 +289,9 @@ def arg_parse():
                         unchanged_threshold = 100,
                         change_wave = 0.75,
                         num_workers = 0,
-                        graph_opt = 'gene',
+                        # graph_opt = 'gene',
                         # graph_opt = 'subject',
-                        # graph_opt = 'GinG',
+                        graph_opt = 'GinG',
                         gene_input_dim = 6, # gene embedding parameters
                         gene_hidden_dim = 18,
                         gene_output_dim = 18,
@@ -318,9 +329,9 @@ def run_model(k, fold_n, nth_training_fold_num):
 
 if __name__ == "__main__":
     k = 5
-    fold_num_train = 5
+    fold_num_train = 10
     # Set fold number
-    for fold_n in range(1, k + 1):
+    for fold_n in range(1, 1 + 1):
         # Record the best performance on each fold
         fold_n_max_test_acc = 0
         fold_n_max_unit = 0
