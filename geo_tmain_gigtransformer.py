@@ -331,7 +331,7 @@ if __name__ == "__main__":
     k = 5
     fold_num_train = 10
     # Set fold number
-    for fold_n in range(1, 1 + 1):
+    for fold_n in range(1, k + 1):
         # Record the best performance on each fold
         fold_n_max_test_acc = 0
         fold_n_max_unit = 0
