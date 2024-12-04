@@ -73,7 +73,8 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
     num_feature = 6
     gene_num_dict_df = pd.read_csv('./data/filtered_data/gene_num_dict_df.csv')
     num_gene_node = gene_num_dict_df.shape[0]
-    gene_feature = np.load('./data/post_data/gene_x.npy', allow_pickle=True)
+    # gene_feature = np.load('./data/post_data/gene_x.npy', allow_pickle=True)
+    gene_feature = np.load('./data/post_data/norm_gene_x.npy', allow_pickle=True)
     gene_feature = gene_feature.astype(np.float32)  # or np.float64 depending on your data
     gene_edge_index = np.load('./data/post_data/gene_edge_index.npy', allow_pickle=True)
     gene_edge_index = gene_edge_index.astype(np.int64)  # or np.float64 depending on your data
@@ -84,7 +85,8 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
     num_subfeature = subfeature_dict_df.shape[0]
     subject_dict_df = pd.read_csv('./data/filtered_data/subject_dict_df.csv')
     num_subject = subject_dict_df.shape[0]
-    graph_feature = np.load('./data/post_data/x.npy')
+    # graph_feature = np.load('./data/post_data/x.npy')
+    graph_feature = np.load('./data/post_data/norm_x.npy')
     edge_index = np.load('./data/post_data/edge_index.npy')
     node_label = np.load('./data/post_data/train_label_' + str(fold_n)  + '.npy')
     node_label_indices = np.argmax(node_label, axis=1)
@@ -199,7 +201,8 @@ def test_geogig(fold_n, model, device, args):
     num_feature = 6
     gene_num_dict_df = pd.read_csv('./data/filtered_data/gene_num_dict_df.csv')
     num_gene_node = gene_num_dict_df.shape[0]
-    gene_feature = np.load('./data/post_data/gene_x.npy', allow_pickle=True)
+    # gene_feature = np.load('./data/post_data/gene_x.npy', allow_pickle=True)
+    gene_feature = np.load('./data/post_data/norm_gene_x.npy', allow_pickle=True)
     gene_feature = gene_feature.astype(np.float32)  # or np.float64 depending on your data
     gene_edge_index = np.load('./data/post_data/gene_edge_index.npy', allow_pickle=True)
     gene_edge_index = gene_edge_index.astype(np.int64)  # or np.float64 depending on your data
@@ -210,7 +213,8 @@ def test_geogig(fold_n, model, device, args):
     num_subfeature = subfeature_dict_df.shape[0]
     subject_dict_df = pd.read_csv('./data/filtered_data/subject_dict_df.csv')
     num_subject = subject_dict_df.shape[0]
-    graph_feature = np.load('./data/post_data/x.npy')
+    # graph_feature = np.load('./data/post_data/x.npy')
+    graph_feature = np.load('./data/post_data/norm_x.npy')
     edge_index = np.load('./data/post_data/edge_index.npy')
     node_label = np.load('./data/post_data/test_label_' + str(fold_n)  + '.npy')
     node_label_indices = np.argmax(node_label, axis=1)

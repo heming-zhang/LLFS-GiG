@@ -25,8 +25,8 @@ ui <- fluidPage(
       
       sliderInput('edge_threshold',
                   'Select the threshold of edge weight to plot',
-                  min = 0.1, max = 1.0,
-                  value = 0.16),
+                  min = 0.0, max = 1.0,
+                  value = 0.10),
       
       selectInput('omics_type', label = 'Selection of the omics to be compared',
                   choices = list('Epigenomics-Upstream' = 1,
@@ -40,7 +40,7 @@ ui <- fluidPage(
       sliderInput('pvalue_threshold',
                   'Select the threshold of marking important genes by p-values',
                   min = 0, max = 0.3,
-                  value = 0.05),
+                  value = 0.01),
       
       sliderInput('giant_comp_threshold',
                   'Select the threshold of each component',
@@ -86,6 +86,11 @@ server <- function(input, output) {
   giant_comp_threshold <- reactive({
     input$giant_comp_threshold
   })
+  
+  
+  t6_data <- read.table("t6.txt", sep = "\t", header = TRUE)
+  t6_gene_list <- t6_data$Locus
+  
   output$network <- renderPlot({
     ############################################################################################################################################################################
     ### 1. READ GRAPH [edge_index, node] FROM FILES
@@ -158,6 +163,8 @@ server <- function(input, output) {
     # Inner join filter_net_node1 and filter_net_node1 on col1 and col2
     inner_net_node <- inner_join(filter_net_node1, filter_net_node2, by = c("gene_node_idx", "gene_node_name"))
     inner_net_node_list <- inner_net_node$gene_node_idx
+    
+    
     # node1
     filter_unique_net_node1 <- filter_net_node1 %>% filter(!(gene_node_idx %in% inner_net_node_list))
     filter_unique_net_node1$Weight2 <- rep(-1, nrow(filter_unique_net_node1))
@@ -214,35 +221,47 @@ server <- function(input, output) {
     print(nrow(refilter_net_node))
     ############################################################################################################################################################################
     
-    # 3.3 SELECT AND CALCULATE P-VALUE
-    # 3.3.1 Pre-seletion of the omics data to be compared for the p-values
-    if (input$omics_type == 6){
-      subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
-      label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
-      t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
-      pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
-      no_t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$no_t2ds == 1, ]
-      
-      t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% t2ds_nodeidx_df$node_idx, ]
-      pret2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% pret2ds_nodeidx_df$node_idx, ]
-      no_t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% no_t2ds_nodeidx_df$node_idx, ]
-      
-      for(i in 1:nrow(refilter_net_node)) {
-        gene_name <- refilter_net_node[i, 'gene_node_name']
-        t2ds_gene_value_list <- t2ds_subject_nodeidx_gene_df[[gene_name]]
-        pret2ds_gene_value_list <- pret2ds_subject_nodeidx_gene_df[[gene_name]]
-        no_t2ds_gene_value_list <- no_t2ds_subject_nodeidx_gene_df[[gene_name]]
-        
-        t2ds_pret2ds_test_result <- wilcox.test(t2ds_gene_value_list, pret2ds_gene_value_list)
-        refilter_net_node$t2ds_pret2ds_pvalue[i] = t2ds_pret2ds_test_result$p.value
-        
-        t2ds_no_t2ds_test_result <- wilcox.test(t2ds_gene_value_list, no_t2ds_gene_value_list)
-        refilter_net_node$t2ds_no_t2ds_pvalue[i] = t2ds_no_t2ds_test_result$p.value
-        
-        pret2ds_no_t2ds_test_result <- wilcox.test(pret2ds_gene_value_list, no_t2ds_gene_value_list)
-        refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
-      }
-    } 
+    # # 3.3 SELECT AND CALCULATE P-VALUE
+    # # 3.3.1 Pre-seletion of the omics data to be compared for the p-values
+    # if (input$omics_type == 6){
+    #   subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
+    #   label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
+    #   t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
+    #   pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
+    #   no_t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$no_t2ds == 1, ]
+    #   
+    #   t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% t2ds_nodeidx_df$node_idx, ]
+    #   pret2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% pret2ds_nodeidx_df$node_idx, ]
+    #   no_t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% no_t2ds_nodeidx_df$node_idx, ]
+    #   
+    #   for(i in 1:nrow(refilter_net_node)) {
+    #     gene_name <- refilter_net_node[i, 'gene_node_name']
+    #     t2ds_gene_value_list <- t2ds_subject_nodeidx_gene_df[[gene_name]]
+    #     pret2ds_gene_value_list <- pret2ds_subject_nodeidx_gene_df[[gene_name]]
+    #     no_t2ds_gene_value_list <- no_t2ds_subject_nodeidx_gene_df[[gene_name]]
+    #     
+    #     t2ds_pret2ds_test_result <- wilcox.test(t2ds_gene_value_list, pret2ds_gene_value_list)
+    #     refilter_net_node$t2ds_pret2ds_pvalue[i] = t2ds_pret2ds_test_result$p.value
+    #     
+    #     t2ds_no_t2ds_test_result <- wilcox.test(t2ds_gene_value_list, no_t2ds_gene_value_list)
+    #     refilter_net_node$t2ds_no_t2ds_pvalue[i] = t2ds_no_t2ds_test_result$p.value
+    #     
+    #     pret2ds_no_t2ds_test_result <- wilcox.test(pret2ds_gene_value_list, no_t2ds_gene_value_list)
+    #     refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
+    #   }
+    # } 
+    # Load pre-calculated p-values (with 'gene' as the column name)
+    t2ds_no_t2ds_pvalue <- read.csv('./pvalues_output/TvsNO_min_pvalues.csv')
+    pret2ds_no_t2ds_pvalue <- read.csv('./pvalues_output/PrevsNO_min_pvalues.csv')
+    
+    # Rename the 'gene' column to 'gene_node_name' to match refilter_net_node
+    t2ds_no_t2ds_pvalue <- t2ds_no_t2ds_pvalue %>% rename(gene_node_name = gene)
+    pret2ds_no_t2ds_pvalue <- pret2ds_no_t2ds_pvalue %>% rename(gene_node_name = gene)
+    
+    # Merge the pre-calculated p-values with the network nodes (using 'gene_node_name' as the key)
+    refilter_net_node <- left_join(refilter_net_node, t2ds_no_t2ds_pvalue, by = "gene_node_name")
+    refilter_net_node <- left_join(refilter_net_node, pret2ds_no_t2ds_pvalue, by = "gene_node_name")
+    print(colnames(refilter_net_node))
     
     # browser()
     
@@ -278,6 +297,25 @@ server <- function(input, output) {
     vertex_cex[V(net)$pret2ds_no_t2ds_pvalue<=pvalue_threshold()] = input$imgene_label_size
     vertex_cex[V(net)$t2ds_no_t2ds_pvalue<=pvalue_threshold() & V(net)$pret2ds_no_t2ds_test<=pvalue_threshold()] = input$imgene_label_size
     
+    
+    # Loop through all nodes (vertices) in the network
+    for (i in 1:vcount(net)) {
+      gene <- V(net)$gene_node_name[i]  # Get the gene name from the vertex
+      print(paste("Gene at node", i, ":", gene))
+      # Ensure no NA values before comparing
+      if (!is.na(gene)) {
+        if (gene %in% t6_gene_list) {
+          # If the gene is in the t6 gene list, make the border thicker and color it
+          vertex_fcol[i] <- '#FF7b00'  # Make the border red
+          vertex_size[i] <- input$imgene_node_size  # Make the node bigger
+        }
+      } else {
+        # Optional: print or log missing values for debugging
+        print(paste("Missing gene name at node", i))
+      }
+    }
+    
+    
     # edge width
     edge_width = rep(1.0, ecount(net))
     # edge color
@@ -285,7 +323,7 @@ server <- function(input, output) {
     
     set.seed(18)
     plot(net,
-         vertex.frame.width = 2,
+         vertex.frame.width = 4,
          vertex.frame.color = vertex_fcol,
          vertex.color = vertex_col,
          vertex.size = vertex_size,
@@ -298,10 +336,12 @@ server <- function(input, output) {
          layout=layout_with_graphopt)
     ### ADD LEGEND
     legend(x=-1.05, y=1.13, # y= -0.72,
-           legend=c('T2D Important Genes', 'Pre_T2D Important Genes', 'T2D and Pre_T2D Important Genes', 'Genes'), pch=c(21, 21, 21, 21), 
-           col = c('#B2DF8A', '#CAB2D6', '#FB9A99', '#A6CEE3'),
-           pt.bg=c('#B2DF8A', '#CAB2D6', '#FB9A99', '#A6CEE3'), pt.cex=2, cex=1.2, bty='n')
-    legend(x=-1.06, y=0.98, # y= -0.85, 
+           legend=c('Genes', 'T2D Important Genes', 'Pre_T2D Important Genes', 'T2D and Pre_T2D Important Genes','Genes overlapped with genome-wide significant evidence'), pch=c(21, 21, 21, 21, 21), 
+           col = c('#A6CEE3','#B2DF8A', '#CAB2D6', '#FB9A99','#FF7b00'),
+           pt.bg=c('#A6CEE3','#B2DF8A', '#CAB2D6', '#FB9A99','white'), 
+           pt.lwd=c(1, 1, 1, 1, 4),
+           pt.cex=2, cex=1.2, bty='n')
+    legend(x=-1.06, y=0.92, # y= -0.85, 
            legend=c('Gene-Gene Interactions'),
            col=c('#C0C0C0'), lwd=c(2, 3), cex=1.2, bty='n')
   })

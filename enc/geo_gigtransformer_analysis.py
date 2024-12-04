@@ -177,8 +177,9 @@ class GeneTransformerConv(MessagePassing):
             edge_weight_df = edge_weight_df[['Patient_Index', 'Actual_From', 'Actual_To', 'Weight']]
 
             save_path = './analysis/gigtransformer/fold_' + str(self.fold_n)
-            while os.path.exists(save_path) == False:
-                os.mkdir(save_path)
+            # while os.path.exists(save_path) == False:
+            #     os.mkdir(save_path)
+            os.makedirs(save_path, exist_ok=True)
             edge_weight_df.to_csv(save_path + '/' + self.layer + '_edge_weight_' + str(num_subfeature + self.index) + '_' + str(num_subfeature + self.upper_index-1) + '.csv', index=False, header=True)
 
         out = value_j

@@ -112,13 +112,13 @@ def train_geogig(args, fold_n, nth_training_fold_num, device):
     unchanged_count = 0
 
     # Clean result previous epoch_i_pred files
-    folder_name = 'gigtransformer-2/epoch_' + str(epoch_num) + '_fold' + str(fold_n)
+    folder_name = 'gigtransformer-2' + args.graph_opt + '/epoch_' + str(epoch_num) + '_fold' + str(fold_n)
     unit = nth_training_fold_num
     path = './gnn_result/%s-%d' % (folder_name, unit)
     while os.path.exists('./gnn_result') == False:
         os.mkdir('./gnn_result')
-    while os.path.exists('./gnn_result/gigtransformer-2') == False:
-        os.mkdir('./gnn_result/gigtransformer-2')
+    while os.path.exists('./gnn_result/gigtransformer-2' + args.graph_opt) == False:
+        os.mkdir('./gnn_result/gigtransformer-2' + args.graph_opt)
     while os.path.exists(path):
         unit += 1
         path = './gnn_result/%s-%d' % (folder_name, unit)

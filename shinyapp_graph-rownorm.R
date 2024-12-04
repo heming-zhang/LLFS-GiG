@@ -26,12 +26,12 @@ ui <- fluidPage(
       sliderInput('edge_threshold',
                   'Select the threshold of edge weight to plot',
                   min = 0, max = 1.0,
-                  value = 0.08),
+                  value = 0.04),
       
       sliderInput('marking_edge_threshold',
                   'Select the threshold of marking important edge weight',
                   min = 0.1, max = 1.0,
-                  value = 0.17),
+                  value = 0.16),
 
       sliderInput('node_threshold',
                   'Select the threshold of marking important genes',
@@ -41,12 +41,12 @@ ui <- fluidPage(
       sliderInput('pvalue_threshold',
                   'Select the threshold of marking important genes by p-values',
                   min = 0, max = 0.3,
-                  value = 0.1),
+                  value = 0.01),
       
       sliderInput('giant_comp_threshold',
                   'Select the threshold of each component',
                   min = 0.0, max = 20.0,
-                  value = 10.0),
+                  value = 20.0),
 
       sliderInput('gene_node_size',
                   'Select the gene node size',
@@ -90,6 +90,10 @@ server <- function(input, output) {
   giant_comp_threshold <- reactive({
     input$giant_comp_threshold
   })
+  
+  t6_data <- read.table("t6.txt", sep = "\t", header = TRUE)
+  t6_gene_list <- t6_data$Locus
+  
   output$network <- renderPlot({
     ### 1. READ GRAPH [edge_index, node] FROM FILES
     print(input$diabetes_type)
@@ -147,35 +151,48 @@ server <- function(input, output) {
     refilter_node_path = paste(type_path, '_norm_refilter_node_weight_df.csv', sep='')
     write.csv(sorted_refilter_net_node, refilter_node_path)
     
-    # 3.3 SELECT AND CALCULATE P-VALUE
-    subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
-    label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
-    t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
-    pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
-    no_t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$no_t2ds == 1, ]
-
-    t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% t2ds_nodeidx_df$node_idx, ]
-    pret2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% pret2ds_nodeidx_df$node_idx, ]
-    no_t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% no_t2ds_nodeidx_df$node_idx, ]
-
-    for(i in 1:nrow(sorted_refilter_net_node)) {
-      gene_name <- sorted_refilter_net_node[i, 'gene_node_name']
-      t2ds_gene_value_list <- t2ds_subject_nodeidx_gene_df[[gene_name]]
-      pret2ds_gene_value_list <- pret2ds_subject_nodeidx_gene_df[[gene_name]]
-      no_t2ds_gene_value_list <- no_t2ds_subject_nodeidx_gene_df[[gene_name]]
-
-      t2ds_pret2ds_test_result <- wilcox.test(t2ds_gene_value_list, pret2ds_gene_value_list)
-      print(t2ds_pret2ds_test_result$p.value)
-      sorted_refilter_net_node$t2ds_pret2ds_pvalue[i] = t2ds_pret2ds_test_result$p.value
-
-      t2ds_no_t2ds_test_result <- wilcox.test(t2ds_gene_value_list, no_t2ds_gene_value_list)
-      print(t2ds_no_t2ds_test_result$p.value)
-      sorted_refilter_net_node$t2ds_no_t2ds_pvalue[i] = t2ds_no_t2ds_test_result$p.value
-
-      pret2ds_no_t2ds_test_result <- wilcox.test(pret2ds_gene_value_list, no_t2ds_gene_value_list)
-      print(pret2ds_no_t2ds_test_result$p.value)
-      sorted_refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
-    }
+    # # 3.3 SELECT AND CALCULATE P-VALUE
+    # subject_nodeidx_gene_df = read.csv('./data/filtered_data/merged_tran_v1_nodeidx_df.csv')
+    # label_patient_nodeidx_df = read.csv('./data/filtered_data/label_phenodata_onehot_nodeidx_df.csv')
+    # t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$t2ds == 1, ]
+    # pret2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$pret2ds == 1, ]
+    # no_t2ds_nodeidx_df = label_patient_nodeidx_df[label_patient_nodeidx_df$no_t2ds == 1, ]
+    # 
+    # t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% t2ds_nodeidx_df$node_idx, ]
+    # pret2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% pret2ds_nodeidx_df$node_idx, ]
+    # no_t2ds_subject_nodeidx_gene_df = subject_nodeidx_gene_df[subject_nodeidx_gene_df$subject_nodeidx %in% no_t2ds_nodeidx_df$node_idx, ]
+    # 
+    # for(i in 1:nrow(sorted_refilter_net_node)) {
+    #   gene_name <- sorted_refilter_net_node[i, 'gene_node_name']
+    #   t2ds_gene_value_list <- t2ds_subject_nodeidx_gene_df[[gene_name]]
+    #   pret2ds_gene_value_list <- pret2ds_subject_nodeidx_gene_df[[gene_name]]
+    #   no_t2ds_gene_value_list <- no_t2ds_subject_nodeidx_gene_df[[gene_name]]
+    # 
+    #   t2ds_pret2ds_test_result <- wilcox.test(t2ds_gene_value_list, pret2ds_gene_value_list)
+    #   print(t2ds_pret2ds_test_result$p.value)
+    #   sorted_refilter_net_node$t2ds_pret2ds_pvalue[i] = t2ds_pret2ds_test_result$p.value
+    # 
+    #   t2ds_no_t2ds_test_result <- wilcox.test(t2ds_gene_value_list, no_t2ds_gene_value_list)
+    #   print(t2ds_no_t2ds_test_result$p.value)
+    #   sorted_refilter_net_node$t2ds_no_t2ds_pvalue[i] = t2ds_no_t2ds_test_result$p.value
+    # 
+    #   pret2ds_no_t2ds_test_result <- wilcox.test(pret2ds_gene_value_list, no_t2ds_gene_value_list)
+    #   print(pret2ds_no_t2ds_test_result$p.value)
+    #   sorted_refilter_net_node$pret2ds_no_t2ds_pvalue[i] = pret2ds_no_t2ds_test_result$p.value
+    # }
+    # Load pre-calculated p-values (with 'gene' as the column name)
+    t2ds_no_t2ds_pvalue <- read.csv('./pvalues_output/TvsNO_min_pvalues.csv')
+    pret2ds_no_t2ds_pvalue <- read.csv('./pvalues_output/PrevsNO_min_pvalues.csv')
+    
+    # Rename the 'gene' column to 'gene_node_name' to match refilter_net_node
+    t2ds_no_t2ds_pvalue <- t2ds_no_t2ds_pvalue %>% rename(gene_node_name = gene)
+    pret2ds_no_t2ds_pvalue <- pret2ds_no_t2ds_pvalue %>% rename(gene_node_name = gene)
+    
+    # Merge the pre-calculated p-values with the network nodes (using 'gene_node_name' as the key)
+    sorted_refilter_net_node <- left_join(sorted_refilter_net_node, t2ds_no_t2ds_pvalue, by = "gene_node_name")
+    sorted_refilter_net_node <- left_join(sorted_refilter_net_node, pret2ds_no_t2ds_pvalue, by = "gene_node_name")
+    print(colnames(refilter_net_node))
+    
     
     net = graph_from_data_frame(d=refilter_net_edge, vertices=sorted_refilter_net_node, directed=F)
     
@@ -200,16 +217,33 @@ server <- function(input, output) {
     # vertex cex
     vertex_cex = rep(input$gene_label_size, vcount(net))
     vertex_cex[V(net)$Weight>=node_threshold()] = input$imgene_label_size
+    # Loop through all nodes (vertices) in the network
+    for (i in 1:vcount(net)) {
+      gene <- V(net)$gene_node_name[i]  # Get the gene name from the vertex
+      print(paste("Gene at node", i, ":", gene))
+      # Ensure no NA values before comparing
+      if (!is.na(gene)) {
+        if (gene %in% t6_gene_list) {
+          # If the gene is in the t6 gene list, make the border thicker and color it
+          vertex_fcol[i] <- '#FF7b00'  # Make the border red
+        }
+      } else {
+        # Optional: print or log missing values for debugging
+        print(paste("Missing gene name at node", i))
+      }
+    }
+    
+    
     # edge width
     edge_width = (E(net)$Weight)*(5.0)
     edge_width[E(net)$Weight>=marking_edge_threshold()] = (E(net)$Weight)*(10.0)
     # edge color
     edge_color = rep('gray', ecount(net))
     edge_color[E(net)$Weight>=marking_edge_threshold()] = 'black'
-    
+
     set.seed(18)
     plot(net,
-         vertex.frame.width = 2,
+         vertex.frame.width = 4,
          vertex.frame.color = vertex_fcol,
          vertex.color = vertex_col,
          vertex.size = vertex_size,
@@ -222,9 +256,12 @@ server <- function(input, output) {
          layout=layout_nicely)
     ### ADD LEGEND
     legend(x=-1.05, y=1.13, # y= -0.72,
-           legend=c('Genes', 'Important Genes'), pch=c(21, 21), 
-           pt.bg=c('lightblue', '#FB9A99'), pt.cex=2, cex=1.2, bty='n')
-    legend(x=-1.06, y=1.05, # y= -0.85, 
+           legend=c('Genes', 'Important Genes with P value < 0.1', 'Genes overlapped with genome-wide significant evidence'), pch=c(21,21,21), 
+           col=c('lightblue', '#FB9A99', '#FF7b00'),
+           pt.bg=c('lightblue', '#FB9A99', 'white'), 
+           pt.lwd=c(1, 1, 4),
+           pt.cex=2, cex=1.2, bty='n')
+    legend(x=-1.06, y=0.98, # y= -0.85, 
            legend=c('Gene-Gene', 'Important Gene-Gene'),
            col=c('gray', 'black'), lwd=c(5,7), cex=1.2, bty='n')
   })

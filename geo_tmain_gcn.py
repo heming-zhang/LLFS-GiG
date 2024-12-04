@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, MultiStepLR
 
 import utils
 from geo_loader.geo_readgraph import read_geodata
-from enc.geo_gat import GAT
+from enc.geo_gcn import GCN
 
 # Parse arguments from command line
 def arg_parse():
@@ -39,16 +39,16 @@ def arg_parse():
     return parser.parse_args()
 
 
-def build_geogat_model(args, device):
+def build_geogcn_model(args, device):
     print('--- BUILDING UP GNN MODEL ... ---')
     # Get parameters
-    model = GAT(input_dim=args.input_dim, hidden_dim=args.hidden_dim,
-                embedding_dim=args.output_dim, num_head=1)
+    model = GCN(input_dim=args.input_dim, hidden_dim=args.hidden_dim,
+                embedding_dim=args.output_dim)
     model = model.to(device)
     return model
 
 
-def train_geogat_model(data, model, device, args, optimizer, scheduler):
+def train_geogcn_model(data, model, device, args, optimizer, scheduler):
     loss = 0
     optimizer.zero_grad()
     x = Variable(data.x, requires_grad=False).to(device)
@@ -67,9 +67,9 @@ def train_geogat_model(data, model, device, args, optimizer, scheduler):
     return model, loss, x_embed, node_output, ypred, y_nodepred
 
 
-def train_geogat(args, fold_n, nth_training_fold_num, device):
+def train_geogcn(args, fold_n, nth_training_fold_num, device):
     # Build [WeightBiGNN, Decoder] model
-    model = build_geogat_model(args, device)
+    model = build_geogcn_model(args, device)
 
     # Train model on training dataset
     # graph_all_feature = np.load('./data/post_data/all_x.npy', allow_pickle=True)
@@ -93,13 +93,13 @@ def train_geogat(args, fold_n, nth_training_fold_num, device):
     unchanged_count = 0
 
     # Clean result previous epoch_i_pred files
-    folder_name = 'gat/epoch_' + str(epoch_num) + '_fold' + str(fold_n)
+    folder_name = 'gcn/epoch_' + str(epoch_num) + '_fold' + str(fold_n)
     unit = nth_training_fold_num
     path = './gnn_result/%s-%d' % (folder_name, unit)
     while os.path.exists('./gnn_result') == False:
         os.mkdir('./gnn_result')
-    while os.path.exists('./gnn_result/gat') == False:
-        os.mkdir('./gnn_result/gat')
+    while os.path.exists('./gnn_result/gcn') == False:
+        os.mkdir('./gnn_result/gcn')
     while os.path.exists(path):
         unit += 1
         path = './gnn_result/%s-%d' % (folder_name, unit)
@@ -121,7 +121,7 @@ def train_geogat(args, fold_n, nth_training_fold_num, device):
         learning_rate = 0.005
         geo_data = read_geodata(graph_all_feature, edge_index, node_label, node_idx)
         print('TRAINING MODEL...')
-        model, training_loss, x_embed, node_output, ypred, y_nodepred = train_geogat_model(geo_data, model, device, args, optimizer, scheduler)
+        model, training_loss, x_embed, node_output, ypred, y_nodepred = train_geogcn_model(geo_data, model, device, args, optimizer, scheduler)
         print('TRAIN LOSS: ', training_loss)
         y_nodepred = y_nodepred.cpu().detach().numpy()
         train_correct_count = (y_nodepred == node_label_indices).sum()
@@ -136,7 +136,7 @@ def train_geogat(args, fold_n, nth_training_fold_num, device):
                                     'train_label': list(node_label_indices),
                                     'train_pred_label': list(y_nodepred)})
         # Save best test model with trained model
-        test_accuracy, test_confusion_matrix, test_label_df, test_loss = test_geogat(fold_n, model, device)
+        test_accuracy, test_confusion_matrix, test_label_df, test_loss = test_geogcn(fold_n, model, device)
         if test_accuracy > max_test_acc and test_accuracy <= train_accuracy:
             max_test_acc_training_loss = training_loss
             max_test_acc = test_accuracy
@@ -159,7 +159,7 @@ def train_geogat(args, fold_n, nth_training_fold_num, device):
     return max_test_acc
 
 
-def test_geogat_model(data, model, device):
+def test_geogcn_model(data, model, device):
     loss = 0
     x = Variable(data.x, requires_grad=False).to(device)
     edge_index = Variable(data.edge_index, requires_grad=False).to(device)
@@ -172,7 +172,7 @@ def test_geogat_model(data, model, device):
     return model, loss, x_embed, node_output, ypred, y_nodepred
 
 
-def test_geogat(fold_n, model, device):
+def test_geogcn(fold_n, model, device):
     # Test model on test dataset
     # graph_all_feature = np.load('./data/post_data/all_x.npy', allow_pickle=True)
     graph_all_feature = np.load('./data/post_data/norm_all_x.npy', allow_pickle=True)
@@ -186,7 +186,7 @@ def test_geogat(fold_n, model, device):
     model.eval()
     geo_data = read_geodata(graph_all_feature, edge_index, node_label, node_idx)
     print('TEST MODEL...')
-    model, test_loss, x_embed, node_output, ypred, y_nodepred = test_geogat_model(geo_data, model, device)
+    model, test_loss, x_embed, node_output, ypred, y_nodepred = test_geogcn_model(geo_data, model, device)
     print('TEST LOSS: ', test_loss)
     y_nodepred = y_nodepred.cpu().detach().numpy()
     test_correct_count = (y_nodepred == node_label_indices).sum()
@@ -227,7 +227,7 @@ def run_model(k, fold_n, nth_training_fold_num):
     print('MAIN DEVICE: ', device)
 
     ### Train the model
-    max_test_acc = train_geogat(prog_args, fold_n, nth_training_fold_num, device)
+    max_test_acc = train_geogcn(prog_args, fold_n, nth_training_fold_num, device)
     return max_test_acc, prog_args
 
 
